@@ -15,6 +15,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
+app.get('/', (req, res) => {
+  res.json({
+    status: 'success',
+    message: 'Backend Mobile MKI sudah berjalan!'
+  });
+});
 app.use('/api/auth', authRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/daily-activities', dailyActivityRoutes);
@@ -38,6 +44,7 @@ app.use((req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server berjalan di port ${PORT}`);
-}); 
+  console.log('Backend Mobile MKI sudah berjalan dengan baik!');
+});

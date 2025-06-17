@@ -72,7 +72,8 @@ class AuthController {
       console.error('Login error:', error);
       res.status(500).json({
         status: 'error',
-        message: 'Terjadi kesalahan pada server'
+        message: 'Terjadi kesalahan pada server',
+        error: error.message || error.toString()
       });
     }
   }
@@ -155,4 +156,4 @@ class AuthController {
   }
 }
 
-module.exports = AuthController; 
+module.exports = AuthController;
