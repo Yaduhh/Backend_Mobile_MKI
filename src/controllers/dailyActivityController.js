@@ -1,4 +1,20 @@
 const db = require('../config/database');
+const multer = require('multer');
+const path = require('path');
+
+// Multer storage config for dokumentasi
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(process.cwd(), 'upload/dokumentasi'));
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, uniqueSuffix + ext);
+  }
+});
+
+const upload = multer({ storage });
 
 class DailyActivityController {
   // Get all daily activities
@@ -81,8 +97,18 @@ class DailyActivityController {
   // Create new daily activity
   static async createDailyActivity(req, res) {
     try {
+      let dokumentasiArr = [];
+      if (req.files && req.files.length > 0) {
+        dokumentasiArr = req.files.map(file => `dokumentasi/${file.filename}`);
+      } else if (req.body.dokumentasi) {
+        // If dokumentasi is sent as JSON string (for update without new upload)
+        try {
+          dokumentasiArr = JSON.parse(req.body.dokumentasi);
+        } catch (e) {
+          dokumentasiArr = [];
+        }
+      }
       const {
-        dokumentasi,
         perihal,
         pihak_bersangkutan,
         komentar,
@@ -107,7 +133,8 @@ class DailyActivityController {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
-      const dokumentasiJson = JSON.stringify(dokumentasi || []);
+      // Format dokumentasi agar slash di-escape (dokumentasi\/namafile.png)
+      const dokumentasiJson = JSON.stringify(dokumentasiArr).replace(/\//g, '\\/');
       const komentarJson = JSON.stringify(komentar || []);
 
       const [result] = await db.query(query, [
@@ -175,7 +202,8 @@ class DailyActivityController {
         WHERE id = ? AND deleted_status = false
       `;
 
-      const dokumentasiJson = JSON.stringify(dokumentasi || []);
+      // Format dokumentasi agar slash di-escape (dokumentasi\/namafile.png)
+      const dokumentasiJson = JSON.stringify(dokumentasi || []).replace(/\//g, '\\/');
       const komentarJson = JSON.stringify(komentar || []);
 
       const [result] = await db.query(query, [
@@ -258,4 +286,4 @@ class DailyActivityController {
   }
 }
 
-module.exports = DailyActivityController; 
+module.exports = { DailyActivityController, upload };
