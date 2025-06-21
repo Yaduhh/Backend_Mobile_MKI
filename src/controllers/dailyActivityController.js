@@ -1,11 +1,18 @@
 const db = require('../config/database');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+
+// Ensure upload directory exists
+const uploadDir = path.join(process.cwd(), 'upload/dokumentasi');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
 // Multer storage config for dokumentasi
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, path.join(process.cwd(), 'upload/dokumentasi'));
+    cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -14,7 +21,21 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage });
+const upload = multer({ 
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+    files: 10 // Max 10 files
+  },
+  fileFilter: (req, file, cb) => {
+    // Check file type
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Hanya file gambar yang diperbolehkan'), false);
+    }
+  }
+});
 
 class DailyActivityController {
   // Get all daily activities
@@ -61,11 +82,40 @@ class DailyActivityController {
       console.log('SQL Params:', params);
       const [activities] = await db.query(query, params);
       // Parse JSON fields
-      const formattedActivities = activities.map(activity => ({
-        ...activity,
-        dokumentasi: JSON.parse(activity.dokumentasi || '[]'),
-        komentar: JSON.parse(activity.komentar || '[]')
-      }));
+      const formattedActivities = activities.map(activity => {
+        // Parse dokumentasi
+        let dokumentasi = [];
+        try {
+          dokumentasi = JSON.parse(activity.dokumentasi || '[]');
+        } catch (e) {
+          dokumentasi = [];
+        }
+        
+        // Parse komentar dengan format yang benar
+        let komentar = [];
+        try {
+          const komentarRaw = activity.komentar;
+          if (komentarRaw) {
+            // Handle format string JSON yang di-wrap kutip ganda
+            let str = komentarRaw;
+            if (str.startsWith('"') && str.endsWith('"')) {
+              str = str.slice(1, -1);
+            }
+            // Unescape kutip ganda
+            str = str.replace(/\\"/g, '"');
+            const parsed = JSON.parse(str);
+            komentar = Array.isArray(parsed) ? parsed : [];
+          }
+        } catch (e) {
+          komentar = [];
+        }
+        
+        return {
+          ...activity,
+          dokumentasi,
+          komentar
+        };
+      });
       res.json({
         success: true,
         data: formattedActivities
@@ -104,8 +154,34 @@ class DailyActivityController {
       }
 
       const activity = activities[0];
-      activity.dokumentasi = JSON.parse(activity.dokumentasi || '[]');
-      activity.komentar = JSON.parse(activity.komentar || '[]');
+      
+      // Parse dokumentasi
+      try {
+        activity.dokumentasi = JSON.parse(activity.dokumentasi || '[]');
+      } catch (e) {
+        activity.dokumentasi = [];
+      }
+      
+      // Parse komentar dengan format yang benar
+      try {
+        const komentarRaw = activity.komentar;
+        if (komentarRaw) {
+          // Handle format string JSON yang di-wrap kutip ganda
+          let str = komentarRaw;
+          if (str.startsWith('"') && str.endsWith('"')) {
+            str = str.slice(1, -1);
+          }
+          // Unescape kutip ganda
+          str = str.replace(/\\"/g, '"');
+          const parsed = JSON.parse(str);
+          activity.komentar = Array.isArray(parsed) ? parsed : [];
+        } else {
+          activity.komentar = [];
+        }
+      } catch (e) {
+        console.error('Error parsing komentar:', e);
+        activity.komentar = [];
+      }
 
       res.json({
         success: true,
@@ -137,10 +213,17 @@ class DailyActivityController {
       const {
         perihal,
         pihak_bersangkutan,
-        komentar,
         summary,
         lokasi
       } = req.body;
+
+      // Validate required fields
+      if (!perihal || !pihak_bersangkutan || !summary || !lokasi) {
+        return res.status(400).json({
+          success: false,
+          message: 'Semua field wajib diisi'
+        });
+      }
 
       const created_by = req.user.id; // Assuming user info is available in req.user
       const now = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
@@ -150,24 +233,21 @@ class DailyActivityController {
           dokumentasi,
           perihal,
           pihak_bersangkutan,
-          komentar,
           summary,
           lokasi,
           created_by,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
       // Format dokumentasi agar slash di-escape (dokumentasi\/namafile.png)
       const dokumentasiJson = JSON.stringify(dokumentasiArr).replace(/\//g, '\\/');
-      const komentarJson = JSON.stringify(komentar === undefined ? null : komentar);
 
       const [result] = await db.query(query, [
         dokumentasiJson,
         perihal,
         pihak_bersangkutan,
-        komentarJson,
         summary,
         lokasi,
         created_by,
@@ -194,6 +274,22 @@ class DailyActivityController {
       }
     } catch (error) {
       console.error('Error creating daily activity:', error);
+      
+      // Handle specific database errors
+      if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+        return res.status(400).json({
+          success: false,
+          message: 'Client yang dipilih tidak ditemukan'
+        });
+      }
+      
+      if (error.code === 'ER_DUP_ENTRY') {
+        return res.status(400).json({
+          success: false,
+          message: 'Data duplikat ditemukan'
+        });
+      }
+      
       res.status(500).json({
         success: false,
         message: 'Failed to create daily activity'
@@ -206,7 +302,7 @@ class DailyActivityController {
     try {
       const { id } = req.params;
       let dokumentasiArr = [];
-      let perihal, pihak_bersangkutan, komentar, summary, lokasi;
+      let perihal, pihak_bersangkutan, summary, lokasi;
       // Cek apakah request multipart (ada file)
       if (req.files && req.files.length > 0) {
         // Ambil file baru
@@ -231,7 +327,6 @@ class DailyActivityController {
         }
         perihal = req.body.perihal;
         pihak_bersangkutan = req.body.pihak_bersangkutan;
-        komentar = [];
         summary = req.body.summary;
         lokasi = req.body.lokasi;
       } else {
@@ -249,7 +344,6 @@ class DailyActivityController {
         dokumentasiArr = dokArr;
         perihal = p;
         pihak_bersangkutan = pb;
-        komentar = [];
         summary = s;
         lokasi = l;
       }
@@ -259,19 +353,16 @@ class DailyActivityController {
         SET dokumentasi = ?,
             perihal = ?,
             pihak_bersangkutan = ?,
-            komentar = ?,
             summary = ?,
             lokasi = ?,
             updated_at = ?
         WHERE id = ? AND deleted_status = false
       `;
       const dokumentasiJson = JSON.stringify(dokumentasiArr).replace(/\//g, '\\/');
-      const komentarJson = JSON.stringify(komentar === undefined ? null : komentar);
       const [result] = await db.query(query, [
         dokumentasiJson,
         perihal,
         pihak_bersangkutan,
-        komentarJson,
         summary,
         lokasi,
         now,
@@ -289,8 +380,35 @@ class DailyActivityController {
       );
       if (updatedActivity.length > 0) {
         const activity = updatedActivity[0];
-        activity.dokumentasi = JSON.parse(activity.dokumentasi || '[]');
-        activity.komentar = JSON.parse(activity.komentar || '[]');
+        
+        // Parse dokumentasi
+        try {
+          activity.dokumentasi = JSON.parse(activity.dokumentasi || '[]');
+        } catch (e) {
+          activity.dokumentasi = [];
+        }
+        
+        // Parse komentar dengan format yang benar
+        try {
+          const komentarRaw = activity.komentar;
+          if (komentarRaw) {
+            // Handle format string JSON yang di-wrap kutip ganda
+            let str = komentarRaw;
+            if (str.startsWith('"') && str.endsWith('"')) {
+              str = str.slice(1, -1);
+            }
+            // Unescape kutip ganda
+            str = str.replace(/\\"/g, '"');
+            const parsed = JSON.parse(str);
+            activity.komentar = Array.isArray(parsed) ? parsed : [];
+          } else {
+            activity.komentar = [];
+          }
+        } catch (e) {
+          console.error('Error parsing komentar:', e);
+          activity.komentar = [];
+        }
+        
         res.json({
           success: true,
           data: activity
@@ -350,30 +468,48 @@ class DailyActivityController {
       if (!message || !message.trim()) {
         return res.status(400).json({ success: false, message: 'Komentar tidak boleh kosong' });
       }
+      
       // Ambil user dari req.user
       const user = req.user;
       if (!user) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
+      
       // Ambil data activity
       const [rows] = await db.query('SELECT komentar FROM daily_activities WHERE id = ? AND deleted_status = false', [id]);
       if (!rows.length) {
         return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
       }
+      
+      // Parse komentar yang ada
       let komentarArr = [];
       try {
-        const parsed = JSON.parse(rows[0].komentar || '[]');
-        komentarArr = Array.isArray(parsed) ? parsed : [];
+        const komentarRaw = rows[0].komentar;
+        if (komentarRaw) {
+          // Handle format string JSON yang di-wrap kutip ganda
+          let str = komentarRaw;
+          if (str.startsWith('"') && str.endsWith('"')) {
+            str = str.slice(1, -1);
+          }
+          // Unescape kutip ganda
+          str = str.replace(/\\"/g, '"');
+          const parsed = JSON.parse(str);
+          komentarArr = Array.isArray(parsed) ? parsed : [];
+        }
       } catch (e) {
+        console.error('Error parsing existing comments:', e);
         komentarArr = [];
       }
+      
       // Format timestamp as YYYY-MM-DDTHH:mm:ss+07:00
       const now = new Date(Date.now() + 7 * 60 * 60 * 1000);
       const pad = n => n < 10 ? '0' + n : n;
       const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}+07:00`;
+      
       // Ambil user_name dari body jika ada, jika tidak pakai user.name
       const userNameFinal = (req.body.user_name && req.body.user_name.trim()) ? req.body.user_name.trim() : (user.name || 'User');
-      // Tambah komentar baru
+      
+      // Tambah komentar baru di akhir array (komentar terbaru di bawah)
       const newComment = {
         user_id: user.id,
         user_name: userNameFinal,
@@ -381,11 +517,15 @@ class DailyActivityController {
         message: message.trim(),
         timestamp: timestamp,
       };
-      komentarArr.unshift(newComment);
+      
+      komentarArr.push(newComment);
+      
       // Simpan ke database sebagai string array JSON dengan tanda kutip ganda di awal/akhir
       let komentarJson = JSON.stringify(komentarArr);
       komentarJson = `"${komentarJson.replace(/"/g, '\\"')}"`;
+      
       await db.query('UPDATE daily_activities SET komentar = ? WHERE id = ?', [komentarJson, id]);
+      
       res.json({ success: true, data: newComment });
     } catch (error) {
       console.error('Error add comment:', error);
