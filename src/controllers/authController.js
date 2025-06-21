@@ -48,7 +48,7 @@ class AuthController {
           email: user.email,
           role: user.role
         },
-        process.env.JWT_SECRET,
+        process.env.JWT_SECRET || 'mki_secret_key_2024',
         { expiresIn: '24h' }
       );
 

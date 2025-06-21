@@ -4,10 +4,15 @@ const pool = require('../config/database');
 async function getAllClients(req, res) {
   try {
     const query = `
-      SELECT c.*, u.name as creator_name 
+      SELECT 
+        c.*, 
+        u.name as creator_name,
+        COALESCE(COUNT(da.id), 0) as visit_count
       FROM clients c
       LEFT JOIN users u ON c.created_by = u.id
+      LEFT JOIN daily_activities da ON c.id = da.pihak_bersangkutan AND da.deleted_status = false
       WHERE c.status_deleted = false
+      GROUP BY c.id, c.nama, c.email, c.notelp, c.nama_perusahaan, c.alamat, c.description_json, c.status, c.created_by, c.created_at, c.updated_at, u.name
       ORDER BY c.created_at DESC
     `;
     
@@ -38,10 +43,15 @@ async function getClientById(req, res) {
     const { id } = req.params;
     
     const query = `
-      SELECT c.*, u.name as creator_name 
+      SELECT 
+        c.*, 
+        u.name as creator_name,
+        COALESCE(COUNT(da.id), 0) as visit_count
       FROM clients c
       LEFT JOIN users u ON c.created_by = u.id
+      LEFT JOIN daily_activities da ON c.id = da.pihak_bersangkutan AND da.deleted_status = false
       WHERE c.id = ? AND c.status_deleted = false
+      GROUP BY c.id, c.nama, c.email, c.notelp, c.nama_perusahaan, c.alamat, c.description_json, c.status, c.created_by, c.created_at, c.updated_at, u.name
     `;
     
     const [clients] = await pool.query(query, [id]);

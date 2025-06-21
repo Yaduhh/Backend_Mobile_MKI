@@ -6,6 +6,8 @@ const authRoutes = require('./routes/authRoutes');
 const clientRoutes = require('./routes/clientRoutes');
 const dailyActivityRoutes = require('./routes/dailyActivityRoutes');
 const absensiRoutes = require('./routes/absensiRoutes');
+const eventRoutes = require('./routes/eventRoutes');
+const arsipFileRoutes = require('./routes/arsipFileRoutes');
 
 const app = express();
 
@@ -15,6 +17,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // Serve dokumentasi images statically
 app.use('/upload/dokumentasi', express.static(require('path').join(process.cwd(), 'upload/dokumentasi/')));
+// Serve arsip files statically
+app.use('/upload/arsip_files', express.static(require('path').join(process.cwd(), 'upload/arsip_files/')));
 
 // Routes
 app.get('/', (req, res) => {
@@ -27,6 +31,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/daily-activities', dailyActivityRoutes);
 app.use('/api/absensi', absensiRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/arsip-files', arsipFileRoutes);
 
 // Error handling
 app.use((err, req, res, next) => {
@@ -49,4 +55,9 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server berjalan di port ${PORT}`);
   console.log('Backend Mobile MKI sudah berjalan dengan baik!');
+  console.log('Environment variables:');
+  console.log('- DB_HOST:', process.env.DB_HOST || 'localhost (default)');
+  console.log('- DB_USER:', process.env.DB_USER || 'root (default)');
+  console.log('- DB_NAME:', process.env.DB_NAME || 'sistem_mki (default)');
+  console.log('- JWT_SECRET:', process.env.JWT_SECRET ? 'Set' : 'mki_secret_key_2024 (default)');
 });

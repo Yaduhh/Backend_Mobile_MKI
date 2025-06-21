@@ -41,7 +41,7 @@ class DailyActivityController {
   // Get all daily activities
   static async getAllDailyActivities(req, res) {
     try {
-      let { startDate, endDate, userId } = req.query;
+      let { startDate, endDate, userId, clientId } = req.query;
       let where = 'da.deleted_status = false';
       let params = [];
 
@@ -53,11 +53,15 @@ class DailyActivityController {
       if (!endDate) endDate = todayStr;
 
       // Debug log untuk parameter
-      console.log('Query params:', { startDate, endDate, userId });
+      console.log('Query params:', { startDate, endDate, userId, clientId });
 
       if (userId) {
         where += ' AND da.created_by = ?';
         params.push(userId);
+      }
+      if (clientId) {
+        where += ' AND da.pihak_bersangkutan = ?';
+        params.push(clientId);
       }
       if (startDate && endDate) {
         where += ' AND DATE(da.created_at) BETWEEN ? AND ?';
@@ -192,6 +196,73 @@ class DailyActivityController {
       res.status(500).json({
         success: false,
         message: 'Failed to fetch daily activity'
+      });
+    }
+  }
+
+  // Get daily activities by client ID
+  static async getDailyActivitiesByClientId(req, res) {
+    try {
+      const { clientId } = req.params;
+      
+      const query = `
+        SELECT da.*, 
+               u.email as creator_email,
+               c.nama as client_name
+        FROM daily_activities da
+        LEFT JOIN users u ON da.created_by = u.id
+        LEFT JOIN clients c ON da.pihak_bersangkutan = c.id
+        WHERE da.pihak_bersangkutan = ? AND da.deleted_status = false
+        ORDER BY da.created_at DESC
+      `;
+      
+      const [activities] = await db.query(query, [clientId]);
+      
+      // Parse JSON fields
+      const formattedActivities = activities.map(activity => {
+        // Parse dokumentasi
+        let dokumentasi = [];
+        try {
+          dokumentasi = JSON.parse(activity.dokumentasi || '[]');
+        } catch (e) {
+          dokumentasi = [];
+        }
+        
+        // Parse komentar dengan format yang benar
+        let komentar = [];
+        try {
+          const komentarRaw = activity.komentar;
+          if (komentarRaw) {
+            // Handle format string JSON yang di-wrap kutip ganda
+            let str = komentarRaw;
+            if (str.startsWith('"') && str.endsWith('"')) {
+              str = str.slice(1, -1);
+            }
+            // Unescape kutip ganda
+            str = str.replace(/\\"/g, '"');
+            const parsed = JSON.parse(str);
+            komentar = Array.isArray(parsed) ? parsed : [];
+          }
+        } catch (e) {
+          komentar = [];
+        }
+        
+        return {
+          ...activity,
+          dokumentasi,
+          komentar
+        };
+      });
+
+      res.json({
+        success: true,
+        data: formattedActivities
+      });
+    } catch (error) {
+      console.error('Error fetching daily activities by client:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch daily activities for client'
       });
     }
   }
