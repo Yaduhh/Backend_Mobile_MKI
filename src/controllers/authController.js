@@ -154,6 +154,180 @@ class AuthController {
       });
     }
   }
+
+  static async changePassword(req, res) {
+    try {
+      const { current_password, new_password, confirm_password } = req.body;
+      const userId = req.user.id;
+
+      // Validasi input
+      if (!current_password || !new_password || !confirm_password) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Semua field password harus diisi'
+        });
+      }
+
+      // Validasi panjang password baru
+      if (new_password.length < 6) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Password baru minimal 6 karakter'
+        });
+      }
+
+      // Validasi konfirmasi password
+      if (new_password !== confirm_password) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Konfirmasi password tidak cocok'
+        });
+      }
+
+      // Ambil data user
+      const user = await User.findByIdWithPassword(userId);
+      if (!user) {
+        return res.status(404).json({
+          status: 'error',
+          message: 'User tidak ditemukan'
+        });
+      }
+
+      // Verifikasi password saat ini
+      const isValidCurrentPassword = await bcrypt.compare(current_password, user.password);
+      if (!isValidCurrentPassword) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Password saat ini salah'
+        });
+      }
+
+      // Cek apakah password baru sama dengan password lama
+      const isSamePassword = await bcrypt.compare(new_password, user.password);
+      if (isSamePassword) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Password baru tidak boleh sama dengan password saat ini'
+        });
+      }
+
+      // Hash password baru
+      const hashedNewPassword = await bcrypt.hash(new_password, 10);
+
+      // Update password di database
+      await User.updatePassword(userId, hashedNewPassword);
+
+      res.json({
+        status: 'success',
+        message: 'Password berhasil diubah'
+      });
+
+    } catch (error) {
+      console.error('Change password error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Terjadi kesalahan pada server'
+      });
+    }
+  }
+
+  static async updateProfile(req, res) {
+    try {
+      const { name, email, notelp, profile } = req.body;
+      const userId = req.user.id;
+
+      // Validasi input
+      if (!name || !email || !notelp) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Nama, email, dan nomor telepon wajib diisi'
+        });
+      }
+
+      // Validasi format email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Format email tidak valid'
+        });
+      }
+
+      // Cek apakah email sudah digunakan user lain
+      const existingUser = await User.findByEmail(email);
+      if (existingUser && existingUser.id !== userId) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Email sudah digunakan oleh user lain'
+        });
+      }
+
+      // Update profile di database
+      const updateData = {
+        name: name.trim(),
+        email: email.trim(),
+        notelp: notelp.trim(),
+      };
+
+      // Hanya tambahkan profile jika ada dan tidak undefined
+      if (profile && profile.trim() !== '') {
+        updateData.profile = profile.trim();
+      }
+
+      console.log('Update data:', updateData); // Debug log
+
+      const success = await User.update(userId, updateData);
+      if (!success) {
+        return res.status(404).json({
+          status: 'error',
+          message: 'User tidak ditemukan'
+        });
+      }
+
+      // Ambil data user yang sudah diupdate
+      const updatedUser = await User.findById(userId);
+
+      res.json({
+        status: 'success',
+        message: 'Profil berhasil diperbarui',
+        data: updatedUser
+      });
+
+    } catch (error) {
+      console.error('Update profile error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Terjadi kesalahan pada server'
+      });
+    }
+  }
+
+  static async uploadProfile(req, res) {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Tidak ada file yang diupload'
+        });
+      }
+
+      // Generate profile path sesuai format yang diminta
+      const profilePath = `profiles/${req.file.filename}`;
+
+      res.json({
+        status: 'success',
+        message: 'Foto profil berhasil diupload',
+        profile_path: profilePath
+      });
+
+    } catch (error) {
+      console.error('Upload profile error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Terjadi kesalahan saat upload foto profil'
+      });
+    }
+  }
 }
 
 module.exports = AuthController;

@@ -19,6 +19,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/upload/dokumentasi', express.static(require('path').join(process.cwd(), 'upload/dokumentasi/')));
 // Serve arsip files statically
 app.use('/upload/arsip_files', express.static(require('path').join(process.cwd(), 'upload/arsip_files/')));
+// Serve profile images statically
+app.use('/upload/profiles', express.static(require('path').join(process.cwd(), 'upload/profiles/')));
 
 // Routes
 app.get('/', (req, res) => {

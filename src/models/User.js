@@ -3,6 +3,8 @@ const bcrypt = require('bcryptjs');
 
 class User {
   static async findByEmail(email) {
+    if (!email) return null;
+    
     const [rows] = await db.execute(
       'SELECT * FROM users WHERE email = ? AND status_deleted = 0',
       [email]
@@ -17,7 +19,7 @@ class User {
     const [result] = await db.execute(
       `INSERT INTO users (name, email, password, role, notelp, profile, status, status_deleted) 
        VALUES (?, ?, ?, ?, ?, ?, 1, 0)`,
-      [name, email, hashedPassword, role, notelp, profile]
+      [name, email, hashedPassword, role, notelp || null, profile || null]
     );
     
     return result.insertId;
@@ -25,16 +27,47 @@ class User {
 
   static async update(id, userData) {
     const { name, email, notelp, profile, status } = userData;
-    const [result] = await db.execute(
-      `UPDATE users 
-       SET name = ?, email = ?, notelp = ?, profile = ?, status = ?
-       WHERE id = ? AND status_deleted = 0`,
-      [name, email, notelp, profile, status, id]
-    );
+    
+    // Build dynamic query and parameters
+    let query = 'UPDATE users SET ';
+    const params = [];
+    const updates = [];
+
+    if (name !== undefined) {
+      updates.push('name = ?');
+      params.push(name);
+    }
+    if (email !== undefined) {
+      updates.push('email = ?');
+      params.push(email);
+    }
+    if (notelp !== undefined) {
+      updates.push('notelp = ?');
+      params.push(notelp);
+    }
+    if (profile !== undefined) {
+      updates.push('profile = ?');
+      params.push(profile);
+    }
+    if (status !== undefined) {
+      updates.push('status = ?');
+      params.push(status);
+    }
+
+    if (updates.length === 0) {
+      return false; // No fields to update
+    }
+
+    query += updates.join(', ') + ' WHERE id = ? AND status_deleted = 0';
+    params.push(id);
+
+    const [result] = await db.execute(query, params);
     return result.affectedRows > 0;
   }
 
   static async softDelete(id) {
+    if (!id) return false;
+    
     const [result] = await db.execute(
       'UPDATE users SET status_deleted = 1 WHERE id = ?',
       [id]
@@ -50,11 +83,33 @@ class User {
   }
 
   static async findById(id) {
+    if (!id) return null;
+    
     const [rows] = await db.execute(
       'SELECT id, name, email, role, notelp, profile, status FROM users WHERE id = ? AND status_deleted = 0',
       [id]
     );
     return rows[0];
+  }
+
+  static async findByIdWithPassword(id) {
+    if (!id) return null;
+    
+    const [rows] = await db.execute(
+      'SELECT id, name, email, password, role, notelp, profile, status FROM users WHERE id = ? AND status_deleted = 0',
+      [id]
+    );
+    return rows[0];
+  }
+
+  static async updatePassword(id, hashedPassword) {
+    if (!id || !hashedPassword) return false;
+    
+    const [result] = await db.execute(
+      'UPDATE users SET password = ? WHERE id = ? AND status_deleted = 0',
+      [hashedPassword, id]
+    );
+    return result.affectedRows > 0;
   }
 }
 

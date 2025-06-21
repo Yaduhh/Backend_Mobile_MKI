@@ -18,9 +18,6 @@ router.get('/past', auth, eventController.getPastEvents);
 // Get dashboard data for sales
 router.get('/dashboard', auth, eventController.getDashboard);
 
-// Get event by ID (with permission check)
-router.get('/:id', auth, eventController.getEventById);
-
 // Create new event (only for admin/creator)
 router.post('/', auth, eventController.createEvent);
 
@@ -29,5 +26,8 @@ router.put('/:id', auth, eventController.updateEvent);
 
 // Delete event (only for creator)
 router.delete('/:id', auth, eventController.deleteEvent);
+
+// Get event by ID (with permission check) - harus di akhir agar tidak mengganggu route lain
+router.get('/:id', auth, eventController.getEventById);
 
 module.exports = router; 

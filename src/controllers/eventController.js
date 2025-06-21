@@ -95,7 +95,7 @@ const eventController = {
           ...event,
           peserta: event.peserta ? JSON.parse(event.peserta) : []
         }))
-        .filter(event => event.peserta.includes(userId));
+        .filter(event => event.peserta.includes(userId.toString()) || event.peserta.includes(userId));
 
       res.json({
         success: true,
@@ -150,6 +150,9 @@ const eventController = {
       const { id } = req.params;
       const userId = req.user.id;
       
+      console.log('Getting event with ID:', id);
+      console.log('User ID:', userId);
+      
       const query = `
         SELECT 
           e.*,
@@ -173,25 +176,44 @@ const eventController = {
         peserta: results[0].peserta ? JSON.parse(results[0].peserta) : []
       };
 
-      // Check if user is invited to this event
-      if (!event.peserta.includes(userId)) {
-        return res.status(403).json({
-          success: false,
-          message: 'Anda tidak diundang ke event ini'
-        });
-      }
+      console.log('Event peserta:', event.peserta);
 
       // Get invited users details
       if (event.peserta.length > 0) {
+        // Convert string IDs to integers for the query
+        const participantIds = event.peserta.map(id => parseInt(id));
+        console.log('Participant IDs:', participantIds);
+        
         const invitedUsersQuery = `
           SELECT id, name, email
           FROM users 
-          WHERE id IN (${event.peserta.map(() => '?').join(',')})
+          WHERE id IN (${participantIds.map(() => '?').join(',')})
+          AND status_deleted = 0
         `;
         
-        const [invitedUsers] = await db.execute(invitedUsersQuery, event.peserta);
+        console.log('Query:', invitedUsersQuery);
+        console.log('Query params:', participantIds);
+        
+        const [invitedUsers] = await db.execute(invitedUsersQuery, participantIds);
+        console.log('Invited users result:', invitedUsers);
+        
         event.invitedUsers = invitedUsers;
+      } else {
+        event.invitedUsers = [];
       }
+
+      // Add user participation status - convert userId to string for comparison
+      event.isUserInvited = event.peserta.includes(userId.toString()) || event.peserta.includes(userId);
+      event.isUserCreator = event.created_by === userId;
+
+      console.log('Final event data:', {
+        id: event.id,
+        nama_event: event.nama_event,
+        peserta_count: event.peserta.length,
+        invitedUsers_count: event.invitedUsers.length,
+        isUserInvited: event.isUserInvited,
+        isUserCreator: event.isUserCreator
+      });
 
       res.json({
         success: true,
@@ -253,7 +275,7 @@ const eventController = {
 
       // Filter my upcoming events (where I'm invited)
       const myUpcomingEvents = upcomingEvents
-        .filter(event => event.peserta.includes(userId))
+        .filter(event => event.peserta.includes(userId.toString()) || event.peserta.includes(userId))
         .slice(0, 3);
 
       res.json({
