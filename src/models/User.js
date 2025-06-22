@@ -1,5 +1,5 @@
 const db = require('../config/database');
-const bcrypt = require('bcryptjs');
+const { generateLaravelCompatibleHash } = require('../utils/bcryptHelper');
 
 class User {
   static async findByEmail(email) {
@@ -14,7 +14,8 @@ class User {
 
   static async create(userData) {
     const { name, email, password, role, notelp, profile } = userData;
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Hash password menggunakan helper yang kompatibel dengan Laravel
+    const hashedPassword = await generateLaravelCompatibleHash(password, 12);
     
     const [result] = await db.execute(
       `INSERT INTO users (name, email, password, role, notelp, profile, status, status_deleted) 
@@ -102,12 +103,10 @@ class User {
     return rows[0];
   }
 
-  static async updatePassword(id, hashedPassword) {
-    if (!id || !hashedPassword) return false;
-    
+  static async updatePassword(userId, hashedPassword) {
     const [result] = await db.execute(
-      'UPDATE users SET password = ? WHERE id = ? AND status_deleted = 0',
-      [hashedPassword, id]
+      'UPDATE users SET password = ? WHERE id = ?',
+      [hashedPassword, userId]
     );
     return result.affectedRows > 0;
   }

@@ -11,12 +11,12 @@ async function getAllClients(req, res) {
       FROM clients c
       LEFT JOIN users u ON c.created_by = u.id
       LEFT JOIN daily_activities da ON c.id = da.pihak_bersangkutan AND da.deleted_status = false
-      WHERE c.status_deleted = false
+      WHERE c.status_deleted = false AND c.created_by = ?
       GROUP BY c.id, c.nama, c.email, c.notelp, c.nama_perusahaan, c.alamat, c.description_json, c.status, c.created_by, c.created_at, c.updated_at, u.name
       ORDER BY c.created_at DESC
     `;
     
-    const [clients] = await pool.query(query);
+    const [clients] = await pool.query(query, [req.user.id]);
     
     // Transform description_json to description array
     const transformedClients = clients.map(client => ({
@@ -50,11 +50,11 @@ async function getClientById(req, res) {
       FROM clients c
       LEFT JOIN users u ON c.created_by = u.id
       LEFT JOIN daily_activities da ON c.id = da.pihak_bersangkutan AND da.deleted_status = false
-      WHERE c.id = ? AND c.status_deleted = false
+      WHERE c.id = ? AND c.status_deleted = false AND c.created_by = ?
       GROUP BY c.id, c.nama, c.email, c.notelp, c.nama_perusahaan, c.alamat, c.description_json, c.status, c.created_by, c.created_at, c.updated_at, u.name
     `;
     
-    const [clients] = await pool.query(query, [id]);
+    const [clients] = await pool.query(query, [id, req.user.id]);
     
     if (clients.length === 0) {
       return res.status(404).json({
@@ -172,10 +172,10 @@ async function updateClient(req, res) {
       status
     } = req.body;
 
-    // Check if client exists
+    // Check if client exists and belongs to the current user
     const [existingClient] = await pool.query(
-      'SELECT * FROM clients WHERE id = ? AND status_deleted = false',
-      [id]
+      'SELECT * FROM clients WHERE id = ? AND status_deleted = false AND created_by = ?',
+      [id, req.user.id]
     );
 
     if (existingClient.length === 0) {
@@ -201,7 +201,7 @@ async function updateClient(req, res) {
         description_json = ?,
         status = ?,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND status_deleted = false
+      WHERE id = ? AND status_deleted = false AND created_by = ?
     `;
 
     await pool.query(query, [
@@ -212,7 +212,8 @@ async function updateClient(req, res) {
       alamat || existingClient[0].alamat,
       description_json,
       status !== undefined ? status : existingClient[0].status,
-      id
+      id,
+      req.user.id
     ]);
 
     // Get the updated client
@@ -248,10 +249,10 @@ async function deleteClient(req, res) {
   try {
     const { id } = req.params;
 
-    // Check if client exists
+    // Check if client exists and belongs to the current user
     const [existingClient] = await pool.query(
-      'SELECT * FROM clients WHERE id = ? AND status_deleted = false',
-      [id]
+      'SELECT * FROM clients WHERE id = ? AND status_deleted = false AND created_by = ?',
+      [id, req.user.id]
     );
 
     if (existingClient.length === 0) {
@@ -263,8 +264,8 @@ async function deleteClient(req, res) {
 
     // Soft delete
     await pool.query(
-      'UPDATE clients SET status_deleted = true WHERE id = ?',
-      [id]
+      'UPDATE clients SET status_deleted = true WHERE id = ? AND created_by = ?',
+      [id, req.user.id]
     );
 
     res.json({

@@ -22,7 +22,7 @@ INSERT INTO users (name, email, password, role, notelp, profile, status, status_
 VALUES (
   'Admin',
   'admin@mki.com',
-  '$2a$10$X7UrH5UxX5UxX5UxX5UxX.5UxX5UxX5UxX5UxX5UxX5UxX5UxX5Ux', -- password: admin123
+  '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', -- password: password (bcrypt)
   1,
   '08123456789',
   'Admin MKI',

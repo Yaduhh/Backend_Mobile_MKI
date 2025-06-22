@@ -42,8 +42,8 @@ class DailyActivityController {
   static async getAllDailyActivities(req, res) {
     try {
       let { startDate, endDate, userId, clientId } = req.query;
-      let where = 'da.deleted_status = false';
-      let params = [];
+      let where = 'da.deleted_status = false AND c.created_by = ?';
+      let params = [req.user.id];
 
       // Default tanggal: hari ini jika tidak dikirim
       const today = new Date();
@@ -145,10 +145,10 @@ class DailyActivityController {
         FROM daily_activities da
         LEFT JOIN users u ON da.created_by = u.id
         LEFT JOIN clients c ON da.pihak_bersangkutan = c.id
-        WHERE da.id = ? AND da.deleted_status = false
+        WHERE da.id = ? AND da.deleted_status = false AND c.created_by = ?
       `;
       
-      const [activities] = await db.query(query, [id]);
+      const [activities] = await db.query(query, [id, req.user.id]);
       
       if (activities.length === 0) {
         return res.status(404).json({
@@ -212,11 +212,11 @@ class DailyActivityController {
         FROM daily_activities da
         LEFT JOIN users u ON da.created_by = u.id
         LEFT JOIN clients c ON da.pihak_bersangkutan = c.id
-        WHERE da.pihak_bersangkutan = ? AND da.deleted_status = false
+        WHERE da.pihak_bersangkutan = ? AND da.deleted_status = false AND c.created_by = ?
         ORDER BY da.created_at DESC
       `;
       
-      const [activities] = await db.query(query, [clientId]);
+      const [activities] = await db.query(query, [clientId, req.user.id]);
       
       // Parse JSON fields
       const formattedActivities = activities.map(activity => {
@@ -293,6 +293,19 @@ class DailyActivityController {
         return res.status(400).json({
           success: false,
           message: 'Semua field wajib diisi'
+        });
+      }
+
+      // Check if client exists and belongs to user
+      const [clientCheck] = await db.query(
+        'SELECT id FROM clients WHERE id = ? AND status_deleted = false AND created_by = ?',
+        [pihak_bersangkutan, req.user.id]
+      );
+
+      if (clientCheck.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Client yang dipilih tidak ditemukan atau tidak memiliki akses'
         });
       }
 
@@ -427,7 +440,12 @@ class DailyActivityController {
             summary = ?,
             lokasi = ?,
             updated_at = ?
-        WHERE id = ? AND deleted_status = false
+        WHERE id = ? AND deleted_status = false AND EXISTS (
+          SELECT 1 FROM clients c 
+          WHERE c.id = daily_activities.pihak_bersangkutan 
+          AND c.created_by = ? 
+          AND c.status_deleted = false
+        )
       `;
       const dokumentasiJson = JSON.stringify(dokumentasiArr).replace(/\//g, '\\/');
       const [result] = await db.query(query, [
@@ -437,7 +455,8 @@ class DailyActivityController {
         summary,
         lokasi,
         now,
-        id
+        id,
+        req.user.id
       ]);
       if (result.affectedRows === 0) {
         return res.status(404).json({
@@ -506,10 +525,15 @@ class DailyActivityController {
         UPDATE daily_activities
         SET deleted_status = true,
             updated_at = ?
-        WHERE id = ? AND deleted_status = false
+        WHERE id = ? AND deleted_status = false AND EXISTS (
+          SELECT 1 FROM clients c 
+          WHERE c.id = daily_activities.pihak_bersangkutan 
+          AND c.created_by = ? 
+          AND c.status_deleted = false
+        )
       `;
 
-      const [result] = await db.query(query, [now, id]);
+      const [result] = await db.query(query, [now, id, req.user.id]);
 
       if (result.affectedRows === 0) {
         return res.status(404).json({
@@ -547,7 +571,12 @@ class DailyActivityController {
       }
       
       // Ambil data activity
-      const [rows] = await db.query('SELECT komentar FROM daily_activities WHERE id = ? AND deleted_status = false', [id]);
+      const [rows] = await db.query(`
+        SELECT da.komentar 
+        FROM daily_activities da
+        LEFT JOIN clients c ON da.pihak_bersangkutan = c.id
+        WHERE da.id = ? AND da.deleted_status = false AND c.created_by = ? AND c.status_deleted = false
+      `, [id, req.user.id]);
       if (!rows.length) {
         return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
       }

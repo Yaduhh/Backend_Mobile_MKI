@@ -14,7 +14,7 @@ const auth = (req, res, next) => {
 
     const token = authHeader.split(' ')[1];
 
-    // Verifikasi token
+    // Verifikasi token without expiration check
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'mki_secret_key_2024');
     
     // Tambahkan user ke request
@@ -28,12 +28,7 @@ const auth = (req, res, next) => {
         message: 'Token tidak valid'
       });
     }
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        status: 'error',
-        message: 'Token telah kadaluarsa'
-      });
-    }
+    // Remove TokenExpiredError check since tokens never expire
     res.status(500).json({
       status: 'error',
       message: 'Terjadi kesalahan pada server'

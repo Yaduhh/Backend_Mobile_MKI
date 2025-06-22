@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
+const { generateLaravelCompatibleHash, comparePassword } = require('../utils/bcryptHelper');
 const User = require('../models/User');
 
 class AuthController {
@@ -32,8 +32,8 @@ class AuthController {
         });
       }
 
-      // Verifikasi password
-      const isValidPassword = await bcrypt.compare(password, user.password);
+      // Verifikasi password menggunakan helper yang kompatibel dengan Laravel
+      const isValidPassword = await comparePassword(password, user.password);
       if (!isValidPassword) {
         return res.status(401).json({
           status: 'error',
@@ -48,8 +48,7 @@ class AuthController {
           email: user.email,
           role: user.role
         },
-        process.env.JWT_SECRET || 'mki_secret_key_2024',
-        { expiresIn: '24h' }
+        process.env.JWT_SECRET || 'mki_secret_key_2024'
       );
 
       // Kirim response
@@ -80,14 +79,42 @@ class AuthController {
 
   static async register(req, res) {
     try {
-      const { name, email, password, role, notelp, profile } = req.body;
+      const { name, email, password, role, notelp } = req.body;
 
       // Validasi input
-      if (!name || !email || !password || !role) {
+      if (!name || !email || !password) {
         return res.status(400).json({
           status: 'error',
-          message: 'Semua field wajib diisi'
+          message: 'Nama, email, dan password harus diisi'
         });
+      }
+
+      // Validasi email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Format email tidak valid'
+        });
+      }
+
+      // Validasi password - minimal 8 karakter
+      if (password.length < 8) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Password minimal 8 karakter'
+        });
+      }
+
+      // Validasi nomor telepon (opsional)
+      if (notelp) {
+        const phoneRegex = /^[0-9+\-\s()]+$/;
+        if (!phoneRegex.test(notelp)) {
+          return res.status(400).json({
+            status: 'error',
+            message: 'Format nomor telepon tidak valid'
+          });
+        }
       }
 
       // Cek apakah email sudah terdaftar
@@ -106,7 +133,7 @@ class AuthController {
         password,
         role,
         notelp,
-        profile
+        profile: ''
       });
 
       res.status(201).json({
@@ -118,7 +145,7 @@ class AuthController {
           email,
           role,
           notelp,
-          profile
+          profile: ''
         }
       });
 
@@ -168,11 +195,11 @@ class AuthController {
         });
       }
 
-      // Validasi panjang password baru
-      if (new_password.length < 6) {
+      // Validasi password baru minimal 8 karakter
+      if (new_password.length < 8) {
         return res.status(400).json({
           status: 'error',
-          message: 'Password baru minimal 6 karakter'
+          message: 'Password baru minimal 8 karakter'
         });
       }
 
@@ -193,29 +220,26 @@ class AuthController {
         });
       }
 
-      // Verifikasi password saat ini
-      const isValidCurrentPassword = await bcrypt.compare(current_password, user.password);
-      if (!isValidCurrentPassword) {
+      // Verifikasi password saat ini menggunakan bcrypt
+      const isValidPassword = await comparePassword(current_password, user.password);
+      if (!isValidPassword) {
         return res.status(400).json({
           status: 'error',
           message: 'Password saat ini salah'
         });
       }
 
-      // Cek apakah password baru sama dengan password lama
-      const isSamePassword = await bcrypt.compare(new_password, user.password);
-      if (isSamePassword) {
-        return res.status(400).json({
+      // Hash password baru menggunakan helper yang kompatibel dengan Laravel
+      const hashedNewPassword = await generateLaravelCompatibleHash(new_password, 12);
+
+      // Update password
+      const success = await User.updatePassword(userId, hashedNewPassword);
+      if (!success) {
+        return res.status(500).json({
           status: 'error',
-          message: 'Password baru tidak boleh sama dengan password saat ini'
+          message: 'Gagal mengupdate password'
         });
       }
-
-      // Hash password baru
-      const hashedNewPassword = await bcrypt.hash(new_password, 10);
-
-      // Update password di database
-      await User.updatePassword(userId, hashedNewPassword);
 
       res.json({
         status: 'success',

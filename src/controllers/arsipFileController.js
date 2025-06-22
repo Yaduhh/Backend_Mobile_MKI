@@ -41,8 +41,8 @@ const upload = multer({
 async function getAllArsipFiles(req, res) {
   try {
     const { clientId } = req.query;
-    let where = 'af.status_deleted = false';
-    let params = [];
+    let where = 'af.status_deleted = false AND c.created_by = ?';
+    let params = [req.user.id];
 
     if (clientId) {
       where += ' AND af.id_client = ?';
@@ -94,16 +94,16 @@ async function createArsipFile(req, res) {
         });
       }
 
-      // Check if client exists
+      // Check if client exists and belongs to user
       const [clientCheck] = await pool.query(
-        'SELECT id FROM clients WHERE id = ? AND status_deleted = false',
-        [id_client]
+        'SELECT id FROM clients WHERE id = ? AND status_deleted = false AND created_by = ?',
+        [id_client, req.user.id]
       );
 
       if (clientCheck.length === 0) {
         return res.status(404).json({
           success: false,
-          message: 'Client tidak ditemukan'
+          message: 'Client tidak ditemukan atau tidak memiliki akses'
         });
       }
 
