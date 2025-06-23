@@ -5,13 +5,12 @@ class AdminKunjunganController {
   static async getAllSales(req, res) {
     try {
       const query = `
-        SELECT id, email, nama_lengkap, role
+        SELECT id, email, name, role
         FROM users 
-        WHERE role = 'sales' AND deleted_status = false
-        ORDER BY nama_lengkap ASC
+        WHERE role = 2 AND status_deleted = false
+        ORDER BY name ASC
       `;
       const [sales] = await db.query(query);
-      
       res.json({
         success: true,
         data: sales
@@ -58,7 +57,7 @@ class AdminKunjunganController {
       const query = `
         SELECT da.*, 
                u.email as creator_email,
-               u.nama_lengkap as creator_name,
+               u.name as creator_name,
                c.nama as client_name
         FROM daily_activities da
         LEFT JOIN users u ON da.created_by = u.id
@@ -112,4 +111,4 @@ class AdminKunjunganController {
   }
 }
 
-module.exports = { AdminKunjunganController }; 
+module.exports = { AdminKunjunganController };
