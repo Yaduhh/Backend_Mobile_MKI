@@ -94,10 +94,10 @@ async function createClient(req, res) {
     } = req.body;
 
     // Simple validation
-    if (!nama || !email || !notelp || !nama_perusahaan || !alamat) {
+    if (!nama || !notelp || !nama_perusahaan || !alamat) {
       return res.status(400).json({
         success: false,
-        message: 'All fields are required'
+        message: 'Nama, nomor telepon, nama perusahaan, dan alamat harus diisi'
       });
     }
 
@@ -119,7 +119,7 @@ async function createClient(req, res) {
 
     const [result] = await pool.query(query, [
       nama,
-      email,
+      email || null,
       notelp,
       nama_perusahaan,
       alamat,
@@ -206,7 +206,7 @@ async function updateClient(req, res) {
 
     await pool.query(query, [
       nama || existingClient[0].nama,
-      email || existingClient[0].email,
+      email || existingClient[0].email || null,
       notelp || existingClient[0].notelp,
       nama_perusahaan || existingClient[0].nama_perusahaan,
       alamat || existingClient[0].alamat,
