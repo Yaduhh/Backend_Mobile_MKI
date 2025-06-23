@@ -344,6 +344,54 @@ class DailyActivityController {
         [result.insertId]
       );
 
+      // === ABSENSI LOGIC START === //
+      // 1. Hitung jumlah daily activity user hari ini
+      const userId = created_by;
+      const todayStr = now.slice(0, 10); // format YYYY-MM-DD
+      const [countResult] = await db.query(
+        `SELECT COUNT(*) as count FROM daily_activities WHERE created_by = ? AND DATE(created_at) = ? AND deleted_status = false`,
+        [userId, todayStr]
+      );
+      const activityCount = countResult[0].count;
+
+      // 2. Cek absensi hari ini
+      const [absensiResult] = await db.query(
+        `SELECT * FROM absensi WHERE id_user = ? AND DATE(tgl_absen) = ? AND deleted_status = false`,
+        [userId, todayStr]
+      );
+
+      let absensiInfo = null;
+      let statusAbsen = activityCount >= 3 ? '1' : '0';
+      if (absensiResult.length === 0) {
+        const nowTimestamp = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+        // Insert absensi baru
+        const [insertAbsensi] = await db.query(
+          `INSERT INTO absensi (status_absen, tgl_absen, id_user, id_daily_activity, count, deleted_status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, false, ?, ?)`,
+          [statusAbsen, now, userId, result.insertId, activityCount, nowTimestamp, nowTimestamp]
+        );
+        // Ambil data absensi yang baru dibuat
+        const [newAbsensi] = await db.query(
+          `SELECT * FROM absensi WHERE id = ?`,
+          [insertAbsensi.insertId]
+        );
+        absensiInfo = newAbsensi[0];
+      } else {
+        // Update absensi yang sudah ada
+        const absensiId = absensiResult[0].id;
+        const nowTimestamp = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+        await db.query(
+          `UPDATE absensi SET count = ?, id_daily_activity = ?, status_absen = ?, updated_at = ? WHERE id = ?`,
+          [activityCount, result.insertId, statusAbsen, nowTimestamp, absensiId]
+        );
+        // Ambil data absensi yang sudah diupdate
+        const [updatedAbsensi] = await db.query(
+          `SELECT * FROM absensi WHERE id = ?`,
+          [absensiId]
+        );
+        absensiInfo = updatedAbsensi[0];
+      }
+      // === ABSENSI LOGIC END === //
+
       if (newActivity.length > 0) {
         const activity = newActivity[0];
         activity.dokumentasi = JSON.parse(activity.dokumentasi || '[]');
@@ -351,7 +399,8 @@ class DailyActivityController {
 
         res.status(201).json({
           success: true,
-          data: activity
+          data: activity,
+          absensi: absensiInfo
         });
       } else {
         throw new Error('Failed to retrieve created activity');

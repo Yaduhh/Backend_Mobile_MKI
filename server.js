@@ -8,6 +8,7 @@ const dailyActivityRoutes = require('./src/routes/dailyActivityRoutes');
 const absensiRoutes = require('./src/routes/absensiRoutes');
 const eventRoutes = require('./src/routes/eventRoutes');
 const arsipFileRoutes = require('./src/routes/arsipFileRoutes');
+const adminKunjunganRoutes = require('./src/routes/adminKunjunganRoutes');
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use('/api/daily-activities', dailyActivityRoutes);
 app.use('/api/absensi', absensiRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/arsip-files', arsipFileRoutes);
+app.use('/api/admin/kunjungan', adminKunjunganRoutes);
 
 // Error handling
 app.use((err, req, res, next) => {
