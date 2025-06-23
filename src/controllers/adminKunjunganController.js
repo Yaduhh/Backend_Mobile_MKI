@@ -53,7 +53,7 @@ class AdminKunjunganController {
         where += ' AND DATE(da.created_at) = ?';
         params.push(startDate);
       }
-
+      
       const query = `
         SELECT da.*, 
                u.email as creator_email,
@@ -107,6 +107,220 @@ class AdminKunjunganController {
         success: false,
         message: 'Failed to fetch kunjungan (admin)'
       });
+    }
+  }
+
+  // Get kunjungan by ID
+  static async getKunjunganById(req, res) {
+    try {
+      const { id } = req.params;
+      
+      const query = `
+        SELECT da.*, 
+               u.email as creator_email,
+               u.name as creator_name,
+               c.nama as client_name
+        FROM daily_activities da
+        LEFT JOIN users u ON da.created_by = u.id
+        LEFT JOIN clients c ON da.pihak_bersangkutan = c.id
+        WHERE da.id = ? AND da.deleted_status = false
+      `;
+      
+      const [activities] = await db.query(query, [id]);
+      
+      if (activities.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Kunjungan tidak ditemukan'
+        });
+      }
+
+      const activity = activities[0];
+      
+      // Parse dokumentasi JSON if exists
+      let dokumentasi = [];
+      try {
+        dokumentasi = JSON.parse(activity.dokumentasi || '[]');
+      } catch (e) {
+        dokumentasi = [];
+      }
+      
+      // Parse komentar
+      let komentar = [];
+      try {
+        const komentarRaw = activity.komentar;
+        if (komentarRaw) {
+          let str = komentarRaw;
+          if (str.startsWith('"') && str.endsWith('"')) {
+            str = str.slice(1, -1);
+          }
+          str = str.replace(/\\"/g, '"');
+          const parsed = JSON.parse(str);
+          komentar = Array.isArray(parsed) ? parsed : [];
+        }
+      } catch (e) {
+        komentar = [];
+      }
+      
+      const formattedActivity = {
+        ...activity,
+        dokumentasi,
+        komentar
+      };
+      
+      res.json({
+        success: true,
+        data: formattedActivity,
+        message: 'Detail kunjungan berhasil diambil'
+      });
+    } catch (error) {
+      console.error('Error in getKunjunganById:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Terjadi kesalahan saat mengambil detail kunjungan'
+      });
+    }
+  }
+
+  // Get kunjungan by client ID
+  static async getKunjunganByClientId(req, res) {
+    try {
+      const { clientId } = req.params;
+      
+      const query = `
+        SELECT da.*, 
+               u.email as creator_email,
+               u.name as creator_name,
+               c.nama as client_name
+        FROM daily_activities da
+        LEFT JOIN users u ON da.created_by = u.id
+        LEFT JOIN clients c ON da.pihak_bersangkutan = c.id
+        WHERE da.pihak_bersangkutan = ? AND da.deleted_status = false
+        ORDER BY da.created_at DESC
+      `;
+      
+      const [activities] = await db.query(query, [clientId]);
+      
+      // Parse JSON fields
+      const formattedActivities = activities.map(activity => {
+        // Parse dokumentasi
+        let dokumentasi = [];
+        try {
+          dokumentasi = JSON.parse(activity.dokumentasi || '[]');
+        } catch (e) {
+          dokumentasi = [];
+        }
+        // Parse komentar
+        let komentar = [];
+        try {
+          const komentarRaw = activity.komentar;
+          if (komentarRaw) {
+            let str = komentarRaw;
+            if (str.startsWith('"') && str.endsWith('"')) {
+              str = str.slice(1, -1);
+            }
+            str = str.replace(/\\"/g, '"');
+            const parsed = JSON.parse(str);
+            komentar = Array.isArray(parsed) ? parsed : [];
+          }
+        } catch (e) {
+          komentar = [];
+        }
+        return {
+          ...activity,
+          dokumentasi,
+          komentar
+        };
+      });
+      
+      res.json({
+        success: true,
+        data: formattedActivities,
+        message: 'Data kunjungan client berhasil diambil'
+      });
+    } catch (error) {
+      console.error('Error in getKunjunganByClientId:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Terjadi kesalahan saat mengambil data kunjungan client'
+      });
+    }
+  }
+
+  // Tambah komentar ke kunjungan (admin)
+  static async addComment(req, res) {
+    try {
+      const { id } = req.params;
+      const { message } = req.body;
+      if (!message || !message.trim()) {
+        return res.status(400).json({ success: false, message: 'Komentar tidak boleh kosong' });
+      }
+      
+      // Ambil user dari req.user
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+      
+      // Ambil data activity (admin bisa akses semua kunjungan)
+      const [rows] = await db.query(`
+        SELECT da.komentar 
+        FROM daily_activities da
+        WHERE da.id = ? AND da.deleted_status = false
+      `, [id]);
+      if (!rows.length) {
+        return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
+      }
+      
+      // Parse komentar yang ada
+      let komentarArr = [];
+      try {
+        const komentarRaw = rows[0].komentar;
+        if (komentarRaw) {
+          // Handle format string JSON yang di-wrap kutip ganda
+          let str = komentarRaw;
+          if (str.startsWith('"') && str.endsWith('"')) {
+            str = str.slice(1, -1);
+          }
+          // Unescape kutip ganda
+          str = str.replace(/\\"/g, '"');
+          const parsed = JSON.parse(str);
+          komentarArr = Array.isArray(parsed) ? parsed : [];
+        }
+      } catch (e) {
+        console.error('Error parsing existing comments:', e);
+        komentarArr = [];
+      }
+      
+      // Format timestamp as YYYY-MM-DDTHH:mm:ss+07:00
+      const now = new Date(Date.now() + 7 * 60 * 60 * 1000);
+      const pad = n => n < 10 ? '0' + n : n;
+      const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}+07:00`;
+      
+      // Ambil user_name dari body jika ada, jika tidak pakai user.name
+      const userNameFinal = (req.body.user_name && req.body.user_name.trim()) ? req.body.user_name.trim() : (user.name || 'Admin');
+      
+      // Tambah komentar baru di akhir array (komentar terbaru di bawah)
+      const newComment = {
+        user_id: user.id,
+        user_name: userNameFinal,
+        user_profile: user.profile || null,
+        message: message.trim(),
+        timestamp: timestamp,
+      };
+      
+      komentarArr.push(newComment);
+      
+      // Simpan ke database sebagai string array JSON dengan tanda kutip ganda di awal/akhir
+      let komentarJson = JSON.stringify(komentarArr);
+      komentarJson = `"${komentarJson.replace(/"/g, '\\"')}"`;
+      
+      await db.query('UPDATE daily_activities SET komentar = ? WHERE id = ?', [komentarJson, id]);
+      
+      res.json({ success: true, data: newComment });
+    } catch (error) {
+      console.error('Error add comment (admin):', error);
+      res.status(500).json({ success: false, message: 'Gagal menambah komentar' });
     }
   }
 }

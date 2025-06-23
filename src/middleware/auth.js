@@ -2,10 +2,15 @@ const jwt = require('jsonwebtoken');
 
 const auth = (req, res, next) => {
   try {
+    console.log('=== AUTH DEBUG ===');
+    console.log('Headers:', req.headers);
+    
     // Ambil token dari header
     const authHeader = req.headers.authorization;
+    console.log('Auth header:', authHeader);
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ Token tidak ditemukan');
       return res.status(401).json({
         status: 'error',
         message: 'Token tidak ditemukan'
@@ -13,15 +18,20 @@ const auth = (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
+    console.log('Token:', token);
 
     // Verifikasi token without expiration check
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'mki_secret_key_2024');
+    console.log('Decoded token:', decoded);
     
     // Tambahkan user ke request
     req.user = decoded;
+    console.log('✅ Auth berhasil, user:', req.user);
+    console.log('==================');
     
     next();
   } catch (error) {
+    console.log('❌ Auth error:', error);
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         status: 'error',

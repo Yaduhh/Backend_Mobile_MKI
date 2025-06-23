@@ -9,6 +9,7 @@ const absensiRoutes = require('./src/routes/absensiRoutes');
 const eventRoutes = require('./src/routes/eventRoutes');
 const arsipFileRoutes = require('./src/routes/arsipFileRoutes');
 const adminKunjunganRoutes = require('./src/routes/adminKunjunganRoutes');
+const adminClientRoutes = require('./src/routes/adminClientRoutes');
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use('/api/absensi', absensiRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/arsip-files', arsipFileRoutes);
 app.use('/api/admin/kunjungan', adminKunjunganRoutes);
+app.use('/api/admin/clients', adminClientRoutes);
 
 // Error handling
 app.use((err, req, res, next) => {
