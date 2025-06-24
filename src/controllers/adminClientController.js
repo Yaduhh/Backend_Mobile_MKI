@@ -7,15 +7,13 @@ const adminClientController = {
       const query = `
         SELECT 
           c.*, 
-          u.name as sales_name,
-          creator.name as creator_name,
+          u.name as creator_name,
           COALESCE(COUNT(da.id), 0) as visit_count
         FROM clients c
         LEFT JOIN users u ON c.created_by = u.id
-        LEFT JOIN users creator ON c.created_by = creator.id
         LEFT JOIN daily_activities da ON c.id = da.pihak_bersangkutan AND da.deleted_status = false
         WHERE c.status_deleted = false
-        GROUP BY c.id, c.nama, c.email, c.notelp, c.nama_perusahaan, c.alamat, c.description_json, c.status, c.created_by, c.created_at, c.updated_at, u.name, creator.name
+        GROUP BY c.id, c.nama, c.email, c.notelp, c.nama_perusahaan, c.alamat, c.description_json, c.status, c.created_by, c.created_at, c.updated_at, u.name
         ORDER BY c.created_at DESC
       `;
       
@@ -24,22 +22,18 @@ const adminClientController = {
       // Transform description_json to description array
       const transformedClients = clients.map(client => ({
         ...client,
-        description: client.description_json ? JSON.parse(client.description_json).items : [],
-        creator: {
-          name: client.creator_name || null
-        }
+        description: client.description_json ? JSON.parse(JSON.parse(client.description_json)).items : []
       }));
-      
+
       res.json({
         success: true,
-        data: transformedClients,
-        message: 'Data client berhasil diambil'
+        data: transformedClients
       });
     } catch (error) {
       console.error('Error in getAllClients:', error);
       res.status(500).json({
         success: false,
-        message: 'Terjadi kesalahan saat mengambil data client'
+        message: 'Internal server error'
       });
     }
   },
@@ -52,15 +46,13 @@ const adminClientController = {
       const query = `
         SELECT 
           c.*, 
-          u.name as sales_name,
-          creator.name as creator_name,
+          u.name as creator_name,
           COALESCE(COUNT(da.id), 0) as visit_count
         FROM clients c
         LEFT JOIN users u ON c.created_by = u.id
-        LEFT JOIN users creator ON c.created_by = creator.id
         LEFT JOIN daily_activities da ON c.id = da.pihak_bersangkutan AND da.deleted_status = false
         WHERE c.id = ? AND c.status_deleted = false
-        GROUP BY c.id, c.nama, c.email, c.notelp, c.nama_perusahaan, c.alamat, c.description_json, c.status, c.created_by, c.created_at, c.updated_at, u.name, creator.name
+        GROUP BY c.id, c.nama, c.email, c.notelp, c.nama_perusahaan, c.alamat, c.description_json, c.status, c.created_by, c.created_at, c.updated_at, u.name
       `;
       
       const [clients] = await pool.query(query, [id]);
@@ -68,29 +60,23 @@ const adminClientController = {
       if (clients.length === 0) {
         return res.status(404).json({
           success: false,
-          message: 'Client tidak ditemukan'
+          message: 'Client not found'
         });
       }
 
       const client = clients[0];
       // Transform description_json to description array
-      client.description = client.description_json ? JSON.parse(client.description_json).items : [];
-      
-      // Add creator object for consistency with frontend
-      client.creator = {
-        name: client.creator_name || null
-      };
-      
+      client.description = client.description_json ? JSON.parse(JSON.parse(client.description_json)).items : [];
+
       res.json({
         success: true,
-        data: client,
-        message: 'Detail client berhasil diambil'
+        data: client
       });
     } catch (error) {
       console.error('Error in getClientById:', error);
       res.status(500).json({
         success: false,
-        message: 'Terjadi kesalahan saat mengambil detail client'
+        message: 'Internal server error'
       });
     }
   },
@@ -105,55 +91,17 @@ const adminClientController = {
         nama_perusahaan,
         alamat,
         description,
-        created_by,
         status = true
       } = req.body;
-      
-      // Validasi input
+
+      // Simple validation
       if (!nama || !notelp || !nama_perusahaan || !alamat) {
         return res.status(400).json({
           success: false,
           message: 'Nama, nomor telepon, nama perusahaan, dan alamat harus diisi'
         });
       }
-      
-      // Validasi email jika diisi
-      if (email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-          return res.status(400).json({
-            success: false,
-            message: 'Format email tidak valid'
-          });
-        }
-      }
-      
-      // Validasi nomor telepon
-      const phoneRegex = /^\d{10,15}$/;
-      if (!phoneRegex.test(notelp.replace(/\D/g, ''))) {
-        return res.status(400).json({
-          success: false,
-          message: 'Nomor telepon harus 10-15 digit'
-        });
-      }
-      
-      // Check if created_by exists and is a sales
-      if (created_by) {
-        const [users] = await pool.query('SELECT role FROM users WHERE id = ?', [created_by]);
-        if (users.length === 0) {
-          return res.status(400).json({
-            success: false,
-            message: 'Sales tidak ditemukan'
-          });
-        }
-        if (users[0].role !== 2) {
-          return res.status(400).json({
-            success: false,
-            message: 'User yang dipilih bukan sales'
-          });
-        }
-      }
-      
+
       // Create description_json with proper format and escaping
       const description_json = description && description.length > 0 
         ? JSON.stringify(JSON.stringify({ items: description }))
@@ -161,7 +109,7 @@ const adminClientController = {
 
       // Get current timestamp
       const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-      
+
       const query = `
         INSERT INTO clients (
           nama, email, notelp, nama_perusahaan, alamat, 
@@ -169,7 +117,7 @@ const adminClientController = {
           created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
-      
+
       const [result] = await pool.query(query, [
         nama,
         email || null,
@@ -178,11 +126,11 @@ const adminClientController = {
         alamat,
         description_json,
         status,
-        created_by || null,
-        now,
-        now
+        req.user.id, // From auth middleware (admin)
+        now, // created_at
+        now  // updated_at
       ]);
-      
+
       // Get the created client
       const [newClient] = await pool.query(
         'SELECT * FROM clients WHERE id = ?',
@@ -193,20 +141,20 @@ const adminClientController = {
       const parsedDescription = newClient[0].description_json 
         ? JSON.parse(JSON.parse(newClient[0].description_json)).items 
         : [];
-      
+
       res.status(201).json({
         success: true,
+        message: 'Client created successfully',
         data: {
           ...newClient[0],
           description: parsedDescription
-        },
-        message: 'Client berhasil dibuat'
+        }
       });
     } catch (error) {
       console.error('Error in createClient:', error);
       res.status(500).json({
         success: false,
-        message: 'Terjadi kesalahan saat membuat client'
+        message: 'Internal server error'
       });
     }
   },
@@ -222,77 +170,28 @@ const adminClientController = {
         nama_perusahaan,
         alamat,
         description,
-        created_by,
         status
       } = req.body;
-      
+
       // Check if client exists
       const [existingClient] = await pool.query(
         'SELECT * FROM clients WHERE id = ? AND status_deleted = false',
         [id]
       );
-      
+
       if (existingClient.length === 0) {
         return res.status(404).json({
           success: false,
-          message: 'Client tidak ditemukan'
+          message: 'Client not found'
         });
       }
-      
-      // Validasi input
-      if (!nama || !notelp || !nama_perusahaan || !alamat) {
-        return res.status(400).json({
-          success: false,
-          message: 'Nama, nomor telepon, nama perusahaan, dan alamat harus diisi'
-        });
-      }
-      
-      // Validasi email jika diisi
-      if (email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-          return res.status(400).json({
-            success: false,
-            message: 'Format email tidak valid'
-          });
-        }
-      }
-      
-      // Validasi nomor telepon
-      const phoneRegex = /^\d{10,15}$/;
-      if (!phoneRegex.test(notelp.replace(/\D/g, ''))) {
-        return res.status(400).json({
-          success: false,
-          message: 'Nomor telepon harus 10-15 digit'
-        });
-      }
-      
-      // Check if created_by exists and is a sales
-      if (created_by) {
-        const [users] = await pool.query('SELECT role FROM users WHERE id = ?', [created_by]);
-        if (users.length === 0) {
-          return res.status(400).json({
-            success: false,
-            message: 'Sales tidak ditemukan'
-          });
-        }
-        if (users[0].role !== 2) {
-          return res.status(400).json({
-            success: false,
-            message: 'User yang dipilih bukan sales'
-          });
-        }
-      }
-      
+
       // Create description_json with proper format and escaping
       const description_json = description && description.length > 0 
         ? JSON.stringify(JSON.stringify({ items: description }))
         : JSON.stringify(JSON.stringify({ items: [] }));
 
-      // Get current timestamp
-      const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-      
-      const updateQuery = `
+      const query = `
         UPDATE clients 
         SET 
           nama = ?,
@@ -302,12 +201,11 @@ const adminClientController = {
           alamat = ?,
           description_json = ?,
           status = ?,
-          created_by = ?,
           updated_at = ?
         WHERE id = ?
       `;
-      
-      await pool.query(updateQuery, [
+
+      await pool.query(query, [
         nama,
         email || null,
         notelp,
@@ -315,11 +213,10 @@ const adminClientController = {
         alamat,
         description_json,
         status !== undefined ? status : existingClient[0].status,
-        created_by || null,
-        now,
+        new Date().toISOString().slice(0, 19).replace('T', ' '),
         id
       ]);
-      
+
       // Get the updated client
       const [updatedClient] = await pool.query(
         'SELECT * FROM clients WHERE id = ?',
@@ -330,20 +227,20 @@ const adminClientController = {
       const parsedDescription = updatedClient[0].description_json 
         ? JSON.parse(JSON.parse(updatedClient[0].description_json)).items 
         : [];
-      
+
       res.json({
         success: true,
         data: {
           ...updatedClient[0],
           description: parsedDescription
         },
-        message: 'Client berhasil diupdate'
+        message: 'Client updated successfully'
       });
     } catch (error) {
       console.error('Error in updateClient:', error);
       res.status(500).json({
         success: false,
-        message: 'Terjadi kesalahan saat mengupdate client'
+        message: 'Internal server error'
       });
     }
   },
@@ -362,7 +259,7 @@ const adminClientController = {
       if (existingClient.length === 0) {
         return res.status(404).json({
           success: false,
-          message: 'Client tidak ditemukan'
+          message: 'Client not found'
         });
       }
       
@@ -371,13 +268,13 @@ const adminClientController = {
       
       res.json({
         success: true,
-        message: 'Client berhasil dihapus'
+        message: 'Client deleted successfully'
       });
     } catch (error) {
       console.error('Error in deleteClient:', error);
       res.status(500).json({
         success: false,
-        message: 'Terjadi kesalahan saat menghapus client'
+        message: 'Internal server error'
       });
     }
   },
@@ -396,7 +293,7 @@ const adminClientController = {
       if (existingClient.length === 0) {
         return res.status(404).json({
           success: false,
-          message: 'Client yang dihapus tidak ditemukan'
+          message: 'Client not found'
         });
       }
       
@@ -405,13 +302,13 @@ const adminClientController = {
       
       res.json({
         success: true,
-        message: 'Client berhasil dipulihkan'
+        message: 'Client restored successfully'
       });
     } catch (error) {
       console.error('Error in restoreClient:', error);
       res.status(500).json({
         success: false,
-        message: 'Terjadi kesalahan saat memulihkan client'
+        message: 'Internal server error'
       });
     }
   },
@@ -422,7 +319,7 @@ const adminClientController = {
       const query = `
         SELECT 
           c.*,
-          u.name as sales_name
+          u.name as creator_name
         FROM clients c
         LEFT JOIN users u ON c.created_by = u.id
         WHERE c.status_deleted = true
@@ -434,19 +331,18 @@ const adminClientController = {
       // Transform description_json to description array
       const transformedClients = clients.map(client => ({
         ...client,
-        description: client.description_json ? JSON.parse(client.description_json).items : []
+        description: client.description_json ? JSON.parse(JSON.parse(client.description_json)).items : []
       }));
       
       res.json({
         success: true,
-        data: transformedClients,
-        message: 'Data client yang dihapus berhasil diambil'
+        data: transformedClients
       });
     } catch (error) {
       console.error('Error in getDeletedClients:', error);
       res.status(500).json({
         success: false,
-        message: 'Terjadi kesalahan saat mengambil data client yang dihapus'
+        message: 'Internal server error'
       });
     }
   },
@@ -466,7 +362,7 @@ const adminClientController = {
       const searchQuery = `
         SELECT 
           c.*, 
-          u.name as sales_name,
+          u.name as creator_name,
           COALESCE(COUNT(da.id), 0) as visit_count
         FROM clients c
         LEFT JOIN users u ON c.created_by = u.id
@@ -483,19 +379,18 @@ const adminClientController = {
       // Transform description_json to description array
       const transformedClients = clients.map(client => ({
         ...client,
-        description: client.description_json ? JSON.parse(client.description_json).items : []
+        description: client.description_json ? JSON.parse(JSON.parse(client.description_json)).items : []
       }));
       
       res.json({
         success: true,
-        data: transformedClients,
-        message: 'Pencarian client berhasil'
+        data: transformedClients
       });
     } catch (error) {
       console.error('Error in searchClients:', error);
       res.status(500).json({
         success: false,
-        message: 'Terjadi kesalahan saat mencari client'
+        message: 'Internal server error'
       });
     }
   },
@@ -510,14 +405,14 @@ const adminClientController = {
       if (sales.length === 0) {
         return res.status(404).json({
           success: false,
-          message: 'Sales tidak ditemukan'
+          message: 'Sales not found'
         });
       }
       
       const query = `
         SELECT 
           c.*, 
-          u.name as sales_name,
+          u.name as creator_name,
           COALESCE(COUNT(da.id), 0) as visit_count
         FROM clients c
         LEFT JOIN users u ON c.created_by = u.id
@@ -532,19 +427,18 @@ const adminClientController = {
       // Transform description_json to description array
       const transformedClients = clients.map(client => ({
         ...client,
-        description: client.description_json ? JSON.parse(client.description_json).items : []
+        description: client.description_json ? JSON.parse(JSON.parse(client.description_json)).items : []
       }));
       
       res.json({
         success: true,
-        data: transformedClients,
-        message: 'Data client sales berhasil diambil'
+        data: transformedClients
       });
     } catch (error) {
       console.error('Error in getClientsBySales:', error);
       res.status(500).json({
         success: false,
-        message: 'Terjadi kesalahan saat mengambil data client sales'
+        message: 'Internal server error'
       });
     }
   },
@@ -598,14 +492,13 @@ const adminClientController = {
           withVisits: clientsWithVisits[0].total,
           bySales: clientsBySales,
           recent: recentClients[0].total
-        },
-        message: 'Statistik client berhasil diambil'
+        }
       });
     } catch (error) {
       console.error('Error in getClientStats:', error);
       res.status(500).json({
         success: false,
-        message: 'Terjadi kesalahan saat mengambil statistik client'
+        message: 'Internal server error'
       });
     }
   }

@@ -2,6 +2,18 @@ const jwt = require('jsonwebtoken');
 const { generateLaravelCompatibleHash, comparePassword } = require('../utils/bcryptHelper');
 const User = require('../models/User');
 
+// Middleware untuk memastikan user adalah admin
+const adminAuth = (req, res, next) => {
+  if (req.user && req.user.role === 1) {
+    next();
+  } else {
+    res.status(403).json({ 
+      status: 'error', 
+      message: 'Akses ditolak. Hanya admin yang dapat mengakses endpoint ini.' 
+    });
+  }
+};
+
 class AuthController {
   static async login(req, res) {
     try {

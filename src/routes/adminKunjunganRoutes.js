@@ -12,6 +12,9 @@ router.get('/', AdminKunjunganController.getAllKunjungan);
 // GET /api/admin/kunjungan/sales
 router.get('/sales', AdminKunjunganController.getAllSales);
 
+// GET /api/admin/kunjungan/stats/overview
+router.get('/stats/overview', AdminKunjunganController.getKunjunganStats);
+
 // GET /api/admin/kunjungan/:id
 router.get('/:id', AdminKunjunganController.getKunjunganById);
 

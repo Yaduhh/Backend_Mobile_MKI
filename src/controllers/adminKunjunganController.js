@@ -247,6 +247,83 @@ class AdminKunjunganController {
     }
   }
 
+  // Get kunjungan statistics
+  static async getKunjunganStats(req, res) {
+    try {
+      // Total kunjungan
+      const [totalKunjungan] = await db.query('SELECT COUNT(*) as total FROM daily_activities WHERE deleted_status = false');
+      
+      // Kunjungan hari ini
+      const [todayKunjungan] = await db.query(`
+        SELECT COUNT(*) as total 
+        FROM daily_activities 
+        WHERE deleted_status = false 
+          AND DATE(created_at) = CURDATE()
+      `);
+      
+      // Kunjungan bulan ini
+      const [thisMonthKunjungan] = await db.query(`
+        SELECT COUNT(*) as total 
+        FROM daily_activities 
+        WHERE deleted_status = false 
+          AND YEAR(created_at) = YEAR(CURDATE()) 
+          AND MONTH(created_at) = MONTH(CURDATE())
+      `);
+      
+      // Kunjungan per sales
+      const [kunjunganBySales] = await db.query(`
+        SELECT 
+          u.name as sales_name,
+          COUNT(da.id) as kunjungan_count
+        FROM users u
+        LEFT JOIN daily_activities da ON u.id = da.created_by AND da.deleted_status = false
+        WHERE u.role = 2
+        GROUP BY u.id, u.name
+        ORDER BY kunjungan_count DESC
+      `);
+      
+      // Kunjungan per client
+      const [kunjunganByClient] = await db.query(`
+        SELECT 
+          c.nama as client_name,
+          COUNT(da.id) as kunjungan_count
+        FROM clients c
+        LEFT JOIN daily_activities da ON c.id = da.pihak_bersangkutan AND da.deleted_status = false
+        WHERE c.status_deleted = false
+        GROUP BY c.id, c.nama
+        ORDER BY kunjungan_count DESC
+        LIMIT 10
+      `);
+      
+      // Recent kunjungan (last 7 days)
+      const [recentKunjungan] = await db.query(`
+        SELECT COUNT(*) as total 
+        FROM daily_activities 
+        WHERE deleted_status = false 
+          AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+      `);
+      
+      res.json({
+        success: true,
+        data: {
+          total: totalKunjungan[0].total,
+          today: todayKunjungan[0].total,
+          thisMonth: thisMonthKunjungan[0].total,
+          recent: recentKunjungan[0].total,
+          bySales: kunjunganBySales,
+          byClient: kunjunganByClient
+        },
+        message: 'Statistik kunjungan berhasil diambil'
+      });
+    } catch (error) {
+      console.error('Error in getKunjunganStats:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Terjadi kesalahan saat mengambil statistik kunjungan'
+      });
+    }
+  }
+
   // Tambah komentar ke kunjungan (admin)
   static async addComment(req, res) {
     try {

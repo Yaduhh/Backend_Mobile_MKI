@@ -30,6 +30,18 @@ const upload = multer({
   }
 });
 
+// Middleware untuk memastikan user adalah admin
+const adminAuth = (req, res, next) => {
+  if (req.user && req.user.role === 1) {
+    next();
+  } else {
+    res.status(403).json({ 
+      status: 'error', 
+      message: 'Akses ditolak. Hanya admin yang dapat mengakses endpoint ini.' 
+    });
+  }
+};
+
 // Public routes
 router.post('/login', AuthController.login);
 router.post('/register', AuthController.register);
@@ -39,5 +51,11 @@ router.get('/profile', auth, AuthController.getProfile);
 router.post('/change-password', auth, AuthController.changePassword);
 router.post('/update-profile', auth, AuthController.updateProfile);
 router.post('/upload-profile', auth, upload.single('profile'), AuthController.uploadProfile);
+
+// Admin-only routes
+router.get('/admin/profile', auth, adminAuth, AuthController.getProfile);
+router.post('/admin/change-password', auth, adminAuth, AuthController.changePassword);
+router.post('/admin/update-profile', auth, adminAuth, AuthController.updateProfile);
+router.post('/admin/upload-profile', auth, adminAuth, upload.single('profile'), AuthController.uploadProfile);
 
 module.exports = router; 
