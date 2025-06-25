@@ -37,6 +37,7 @@ app.use('/api/absensi', absensiRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/arsip-files', arsipFileRoutes);
 app.use('/api/admin/clients', adminClientRoutes);
+app.use('/api/admin/events', eventRoutes);
 
 // Error handling
 app.use((err, req, res, next) => {

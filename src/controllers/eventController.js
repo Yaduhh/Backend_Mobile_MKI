@@ -378,18 +378,22 @@ const eventController = {
       const { id } = req.params;
       const userId = req.user.id;
 
-      // Check if user is the creator of this event
-      const checkQuery = `SELECT created_by FROM events WHERE id = ? AND status_deleted = 0`;
-      const [checkResults] = await db.execute(checkQuery, [id]);
+      // Check if user is the creator of the event
+      const checkQuery = `
+        SELECT created_by FROM events 
+        WHERE id = ? AND status_deleted = 0
+      `;
       
-      if (checkResults.length === 0) {
+      const [checkResult] = await db.execute(checkQuery, [id]);
+      
+      if (checkResult.length === 0) {
         return res.status(404).json({
           success: false,
           message: 'Event tidak ditemukan'
         });
       }
 
-      if (checkResults[0].created_by !== userId) {
+      if (checkResult[0].created_by !== userId) {
         return res.status(403).json({
           success: false,
           message: 'Anda tidak memiliki izin untuk menghapus event ini'
