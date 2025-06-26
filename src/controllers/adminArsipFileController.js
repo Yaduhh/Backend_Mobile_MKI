@@ -41,7 +41,7 @@ const upload = multer({
 async function getAllArsipFiles(req, res) {
   try {
     const { clientId } = req.query;
-    let where = 'af.status_deleted = false';
+    let where = 'af.status_deleted = 0 AND c.status_deleted = 0'; // File dan client yang aktif
     let params = [];
 
     if (clientId) {
@@ -50,15 +50,72 @@ async function getAllArsipFiles(req, res) {
     }
 
     const query = `
-      SELECT af.*, u.name as creator_name, c.nama as client_name
+      SELECT af.*, u.name as creator_name, c.nama as client_name, c.status_deleted as client_status_deleted
       FROM arsip_file af
+      INNER JOIN clients c ON af.id_client = c.id
       LEFT JOIN users u ON af.created_by = u.id
-      LEFT JOIN clients c ON af.id_client = c.id
       WHERE ${where}
       ORDER BY af.created_at DESC
     `;
 
+    console.log('=== DEBUG ARSIP FILE QUERY ===');
+    console.log('Query:', query);
+    console.log('Params:', params);
+    console.log('Where condition:', where);
+
     const [arsipFiles] = await pool.query(query, params);
+
+    console.log('Result count:', arsipFiles.length);
+    console.log('Sample results:');
+    if (arsipFiles.length > 0) {
+      arsipFiles.slice(0, 3).forEach((file, index) => {
+        console.log(`File ${index + 1}:`, {
+          id: file.id,
+          nama: file.nama,
+          id_client: file.id_client,
+          client_name: file.client_name,
+          client_status_deleted: file.client_status_deleted,
+          file_status_deleted: file.status_deleted
+        });
+      });
+    }
+    console.log('=== END DEBUG ===');
+
+    // Debug: Cek data client yang aktif dan tidak aktif
+    console.log('=== DEBUG CLIENT STATUS ===');
+    const [allClients] = await pool.query(`
+      SELECT id, nama, status_deleted 
+      FROM clients 
+      ORDER BY status_deleted, nama
+    `);
+    
+    const activeClients = allClients.filter(c => c.status_deleted === 0);
+    const deletedClients = allClients.filter(c => c.status_deleted === 1);
+    
+    console.log('Total clients:', allClients.length);
+    console.log('Active clients:', activeClients.length);
+    console.log('Deleted clients:', deletedClients.length);
+    
+    if (deletedClients.length > 0) {
+      console.log('Sample deleted clients:', deletedClients.slice(0, 3));
+    }
+    console.log('=== END CLIENT DEBUG ===');
+
+    // Debug: Cek file arsip yang terhubung ke client yang sudah dihapus
+    console.log('=== DEBUG ARSIP WITH DELETED CLIENTS ===');
+    const [arsipWithDeletedClients] = await pool.query(`
+      SELECT af.id, af.nama, af.id_client, c.nama as client_name, c.status_deleted as client_status_deleted
+      FROM arsip_file af
+      LEFT JOIN clients c ON af.id_client = c.id
+      WHERE af.status_deleted = 0 AND (c.status_deleted = 1 OR c.id IS NULL)
+      ORDER BY af.created_at DESC
+    `);
+    
+    console.log('Arsip files with deleted clients:', arsipWithDeletedClients.length);
+    if (arsipWithDeletedClients.length > 0) {
+      console.log('Sample arsip with deleted clients:', arsipWithDeletedClients.slice(0, 3));
+    }
+    console.log('=== END ARSIP DEBUG ===');
 
     res.json({
       success: true,
@@ -96,7 +153,7 @@ async function createArsipFile(req, res) {
 
       // Check if client exists
       const [clientCheck] = await pool.query(
-        'SELECT id FROM clients WHERE id = ? AND status_deleted = false',
+        'SELECT id FROM clients WHERE id = ? AND status_deleted = 0',
         [id_client]
       );
 
@@ -155,7 +212,7 @@ async function deleteArsipFile(req, res) {
 
     // Check if arsip file exists
     const [arsipFile] = await pool.query(
-      'SELECT * FROM arsip_file WHERE id = ? AND status_deleted = false',
+      'SELECT * FROM arsip_file WHERE id = ? AND status_deleted = 0',
       [id]
     );
 
@@ -168,7 +225,7 @@ async function deleteArsipFile(req, res) {
 
     // Soft delete
     await pool.query(
-      'UPDATE arsip_file SET status_deleted = true, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      'UPDATE arsip_file SET status_deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [id]
     );
 

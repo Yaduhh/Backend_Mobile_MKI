@@ -41,7 +41,7 @@ const upload = multer({
 async function getAllArsipFiles(req, res) {
   try {
     const { clientId } = req.query;
-    let where = 'af.status_deleted = false AND c.created_by = ?';
+    let where = 'af.status_deleted = 0 AND c.status_deleted = 0 AND c.created_by = ?';
     let params = [req.user.id];
 
     if (clientId) {
@@ -52,8 +52,8 @@ async function getAllArsipFiles(req, res) {
     const query = `
       SELECT af.*, u.name as creator_name, c.nama as client_name
       FROM arsip_file af
+      INNER JOIN clients c ON af.id_client = c.id
       LEFT JOIN users u ON af.created_by = u.id
-      LEFT JOIN clients c ON af.id_client = c.id
       WHERE ${where}
       ORDER BY af.created_at DESC
     `;
@@ -96,7 +96,7 @@ async function createArsipFile(req, res) {
 
       // Check if client exists and belongs to user
       const [clientCheck] = await pool.query(
-        'SELECT id FROM clients WHERE id = ? AND status_deleted = false AND created_by = ?',
+        'SELECT id FROM clients WHERE id = ? AND status_deleted = 0 AND created_by = ?',
         [id_client, req.user.id]
       );
 
@@ -155,7 +155,7 @@ async function deleteArsipFile(req, res) {
 
     // Check if arsip file exists and belongs to user
     const [arsipFile] = await pool.query(
-      'SELECT * FROM arsip_file WHERE id = ? AND status_deleted = false AND created_by = ?',
+      'SELECT * FROM arsip_file WHERE id = ? AND status_deleted = 0 AND created_by = ?',
       [id, req.user.id]
     );
 
@@ -168,7 +168,7 @@ async function deleteArsipFile(req, res) {
 
     // Soft delete
     await pool.query(
-      'UPDATE arsip_file SET status_deleted = true, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      'UPDATE arsip_file SET status_deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [id]
     );
 
