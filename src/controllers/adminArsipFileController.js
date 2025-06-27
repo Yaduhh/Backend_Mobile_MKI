@@ -165,13 +165,12 @@ async function createArsipFile(req, res) {
       }
 
       const filePath = `arsip_files/${file.filename}`;
-      const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
       const query = `
         INSERT INTO arsip_file (
           nama, id_client, file, status_deleted, created_by,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, NOW(), NOW())
       `;
 
       const [result] = await pool.query(query, [
@@ -179,9 +178,7 @@ async function createArsipFile(req, res) {
         id_client,
         filePath,
         false,
-        req.user.id,
-        now,
-        now
+        req.user.id
       ]);
 
       // Get the created arsip file
@@ -225,7 +222,7 @@ async function deleteArsipFile(req, res) {
 
     // Soft delete
     await pool.query(
-      'UPDATE arsip_file SET status_deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      'UPDATE arsip_file SET status_deleted = 1, updated_at = NOW() WHERE id = ?',
       [id]
     );
 

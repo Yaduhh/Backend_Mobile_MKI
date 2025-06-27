@@ -39,6 +39,7 @@ app.use('/api/daily-activities', dailyActivityRoutes);
 app.use('/api/absensi', absensiRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/arsip-files', arsipFileRoutes);
+app.use('/api/sales/arsip-files', arsipFileRoutes);
 app.use('/api/admin/kunjungan', adminKunjunganRoutes);
 app.use('/api/admin/clients', adminClientRoutes);
 app.use('/api/admin/arsip-files', adminArsipFileRoutes);
