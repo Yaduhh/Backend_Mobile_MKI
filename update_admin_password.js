@@ -7,8 +7,6 @@ async function updateAdminPassword() {
     const adminPassword = 'password'; // Default Laravel password
     const hashedPassword = await generateLaravelCompatibleHash(adminPassword, 12);
     
-    console.log('Updating admin password to bcrypt hash (Laravel compatible)');
-    
     // Update password admin
     const [result] = await db.execute(
       'UPDATE users SET password = ? WHERE email = ?',
@@ -16,18 +14,14 @@ async function updateAdminPassword() {
     );
     
     if (result.affectedRows > 0) {
-      console.log('Admin password updated successfully!');
-      console.log('New admin credentials:');
-      console.log('Email: admin@mki.com');
-      console.log('Password: password');
-      console.log('Note: This is compatible with Laravel default authentication');
+      return;
     } else {
-      console.log('Admin user not found or password already updated');
+      return;
     }
     
     process.exit(0);
   } catch (error) {
-    console.error('Error updating admin password:', error);
+    return;
     process.exit(1);
   }
 }

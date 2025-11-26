@@ -12,6 +12,8 @@ const adminKunjunganRoutes = require('./src/routes/adminKunjunganRoutes');
 const adminClientRoutes = require('./src/routes/adminClientRoutes');
 const adminArsipFileRoutes = require('./src/routes/adminArsipFileRoutes');
 const adminEventRoutes = require('./src/routes/adminEventRoutes');
+const adminPengajuanRoutes = require('./src/routes/adminPengajuanRoutes');
+const rabRoutes = require('./src/routes/rabRoutes');
 
 const app = express();
 
@@ -44,6 +46,8 @@ app.use('/api/admin/kunjungan', adminKunjunganRoutes);
 app.use('/api/admin/clients', adminClientRoutes);
 app.use('/api/admin/arsip-files', adminArsipFileRoutes);
 app.use('/api/admin/events', adminEventRoutes);
+app.use('/api/admin/pengajuan', adminPengajuanRoutes);
+app.use('/api/supervisi', rabRoutes);
 
 // Error handling
 app.use((err, req, res, next) => {
@@ -65,10 +69,4 @@ app.use((req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server berjalan di port ${PORT}`);
-  console.log('Backend Mobile MKI sudah berjalan dengan baik!');
-  console.log('Environment variables:');
-  console.log('- DB_HOST:', process.env.DB_HOST || 'localhost (default)');
-  console.log('- DB_USER:', process.env.DB_USER || 'root (default)');
-  console.log('- DB_NAME:', process.env.DB_NAME || 'sistem_mki (default)');
-  console.log('- JWT_SECRET:', process.env.JWT_SECRET ? 'Set' : 'mki_secret_key_2024 (default)');
-}); 
+});

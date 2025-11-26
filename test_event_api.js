@@ -17,7 +17,6 @@ async function login() {
     });
 
     const data = await response.json();
-    console.log('Login response:', data);
     
     if (data.success) {
       return data.data.token;
@@ -40,12 +39,10 @@ async function testGetEvents(token) {
     });
 
     const data = await response.json();
-    console.log('Get events response:', data);
     
     if (data.success && data.data.length > 0) {
       return data.data[0].id; // Return first event ID
     } else {
-      console.log('No events found');
       return null;
     }
   } catch (error) {
@@ -64,7 +61,6 @@ async function testGetEventDetail(token, eventId) {
     });
 
     const data = await response.json();
-    console.log('Get event detail response:', data);
     
     return data;
   } catch (error) {
@@ -75,35 +71,21 @@ async function testGetEventDetail(token, eventId) {
 
 // Main test function
 async function runTests() {
-  console.log('Starting API tests...\n');
-  
-  // Test login
-  console.log('1. Testing login...');
+    // Test login
   const token = await login();
   if (!token) {
-    console.log('Login failed, stopping tests');
     return;
   }
-  console.log('Login successful\n');
-  
-  // Test get events
-  console.log('2. Testing get events...');
+    // Test get events
   const eventId = await testGetEvents(token);
   if (!eventId) {
-    console.log('No events found, stopping tests');
     return;
   }
-  console.log(`Found event with ID: ${eventId}\n`);
-  
-  // Test get event detail
-  console.log('3. Testing get event detail...');
+    // Test get event detail
   const eventDetail = await testGetEventDetail(token, eventId);
   if (eventDetail) {
-    console.log('Event detail test completed');
-  } else {
-    console.log('Event detail test failed');
+    return;
   }
 }
 
-// Run tests
 runTests().catch(console.error); 

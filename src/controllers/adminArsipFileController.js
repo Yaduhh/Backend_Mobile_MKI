@@ -58,31 +58,15 @@ async function getAllArsipFiles(req, res) {
       ORDER BY af.created_at DESC
     `;
 
-    console.log('=== DEBUG ARSIP FILE QUERY ===');
-    console.log('Query:', query);
-    console.log('Params:', params);
-    console.log('Where condition:', where);
-
     const [arsipFiles] = await pool.query(query, params);
 
-    console.log('Result count:', arsipFiles.length);
-    console.log('Sample results:');
     if (arsipFiles.length > 0) {
       arsipFiles.slice(0, 3).forEach((file, index) => {
-        console.log(`File ${index + 1}:`, {
-          id: file.id,
-          nama: file.nama,
-          id_client: file.id_client,
-          client_name: file.client_name,
-          client_status_deleted: file.client_status_deleted,
-          file_status_deleted: file.status_deleted
-        });
+        return;
       });
     }
-    console.log('=== END DEBUG ===');
 
     // Debug: Cek data client yang aktif dan tidak aktif
-    console.log('=== DEBUG CLIENT STATUS ===');
     const [allClients] = await pool.query(`
       SELECT id, nama, status_deleted 
       FROM clients 
@@ -92,17 +76,7 @@ async function getAllArsipFiles(req, res) {
     const activeClients = allClients.filter(c => c.status_deleted === 0);
     const deletedClients = allClients.filter(c => c.status_deleted === 1);
     
-    console.log('Total clients:', allClients.length);
-    console.log('Active clients:', activeClients.length);
-    console.log('Deleted clients:', deletedClients.length);
-    
-    if (deletedClients.length > 0) {
-      console.log('Sample deleted clients:', deletedClients.slice(0, 3));
-    }
-    console.log('=== END CLIENT DEBUG ===');
-
     // Debug: Cek file arsip yang terhubung ke client yang sudah dihapus
-    console.log('=== DEBUG ARSIP WITH DELETED CLIENTS ===');
     const [arsipWithDeletedClients] = await pool.query(`
       SELECT af.id, af.nama, af.id_client, c.nama as client_name, c.status_deleted as client_status_deleted
       FROM arsip_file af
@@ -111,18 +85,11 @@ async function getAllArsipFiles(req, res) {
       ORDER BY af.created_at DESC
     `);
     
-    console.log('Arsip files with deleted clients:', arsipWithDeletedClients.length);
-    if (arsipWithDeletedClients.length > 0) {
-      console.log('Sample arsip with deleted clients:', arsipWithDeletedClients.slice(0, 3));
-    }
-    console.log('=== END ARSIP DEBUG ===');
-
     res.json({
       success: true,
       data: arsipFiles
     });
   } catch (error) {
-    console.error('Error in getAllArsipFiles:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'
@@ -194,7 +161,6 @@ async function createArsipFile(req, res) {
       });
     });
   } catch (error) {
-    console.error('Error in createArsipFile:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'
@@ -231,7 +197,6 @@ async function deleteArsipFile(req, res) {
       message: 'Arsip file berhasil dihapus'
     });
   } catch (error) {
-    console.error('Error in deleteArsipFile:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'

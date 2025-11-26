@@ -3,9 +3,6 @@ const db = require('../config/database');
 const adminEventController = {
   // Get all events for admin (with more details)
   getAllEvents: async (req, res) => {
-    console.log('=== getAllEvents called ===');
-    console.log('URL:', req.url);
-    console.log('Method:', req.method);
     try {
       const query = `
         SELECT 
@@ -18,9 +15,7 @@ const adminEventController = {
         ORDER BY e.jadwal DESC
       `;
       
-      console.log('Executing query:', query);
       const [results] = await db.execute(query);
-      console.log('Query results:', results.length, 'events found');
       
       // Parse peserta array for each event
       const events = results.map(event => ({
@@ -29,13 +24,11 @@ const adminEventController = {
         total_participants: event.peserta ? JSON.parse(event.peserta).length : 0
       }));
 
-      console.log('Sending response with', events.length, 'events');
       res.json({
         success: true,
         data: events
       });
     } catch (error) {
-      console.error('Error in getAllEvents:', error);
       res.status(500).json({
         success: false,
         message: 'Terjadi kesalahan server'
@@ -45,9 +38,6 @@ const adminEventController = {
 
   // Get upcoming events for admin
   getUpcomingEvents: async (req, res) => {
-    console.log('=== getUpcomingEvents called ===');
-    console.log('URL:', req.url);
-    console.log('Method:', req.method);
     try {
       const query = `
         SELECT 
@@ -62,9 +52,7 @@ const adminEventController = {
         ORDER BY e.jadwal ASC
       `;
       
-      console.log('Executing query:', query);
       const [results] = await db.execute(query);
-      console.log('Query results:', results.length, 'upcoming events found');
 
       // Parse peserta JSON for each event
       const events = results.map(event => ({
@@ -72,13 +60,11 @@ const adminEventController = {
         peserta: event.peserta ? JSON.parse(event.peserta) : []
       }));
 
-      console.log('Sending response with', events.length, 'upcoming events');
       res.json({
         success: true,
         data: events
       });
     } catch (error) {
-      console.error('Error in getUpcomingEvents:', error);
       res.status(500).json({
         success: false,
         message: 'Terjadi kesalahan server'
@@ -88,9 +74,6 @@ const adminEventController = {
 
   // Get past events for admin
   getPastEvents: async (req, res) => {
-    console.log('=== getPastEvents called ===');
-    console.log('URL:', req.url);
-    console.log('Method:', req.method);
     try {
       const query = `
         SELECT 
@@ -104,9 +87,7 @@ const adminEventController = {
         ORDER BY e.jadwal DESC
       `;
       
-      console.log('Executing query:', query);
       const [results] = await db.execute(query);
-      console.log('Query results:', results.length, 'past events found');
 
       // Parse peserta JSON for each event
       const events = results.map(event => ({
@@ -114,13 +95,11 @@ const adminEventController = {
         peserta: event.peserta ? JSON.parse(event.peserta) : []
       }));
 
-      console.log('Sending response with', events.length, 'past events');
       res.json({
         success: true,
         data: events
       });
     } catch (error) {
-      console.error('Error in getPastEvents:', error);
       res.status(500).json({
         success: false,
         message: 'Terjadi kesalahan server'
@@ -130,9 +109,6 @@ const adminEventController = {
 
   // Get event statistics for admin dashboard
   getStats: async (req, res) => {
-    console.log('=== getStats called ===');
-    console.log('URL:', req.url);
-    console.log('Method:', req.method);
     try {
       const queries = [
         // Total events
@@ -149,7 +125,6 @@ const adminEventController = {
         `SELECT COUNT(*) as completed FROM events WHERE status_deleted = 0 AND status = 'completed'`
       ];
 
-      console.log('Executing stats queries...');
       const results = await Promise.all(
         queries.map(query => db.execute(query))
       );
@@ -163,13 +138,11 @@ const adminEventController = {
         completed: results[5][0][0].completed
       };
 
-      console.log('Stats calculated:', stats);
       res.json({
         success: true,
         data: stats
       });
     } catch (error) {
-      console.error('Error in getStats:', error);
       res.status(500).json({
         success: false,
         message: 'Terjadi kesalahan server'
@@ -179,11 +152,6 @@ const adminEventController = {
 
   // Update event status (admin only)
   updateStatus: async (req, res) => {
-    console.log('=== updateStatus called ===');
-    console.log('URL:', req.url);
-    console.log('Method:', req.method);
-    console.log('Params:', req.params);
-    console.log('Body:', req.body);
     try {
       const { id } = req.params;
       const { status } = req.body;
@@ -201,7 +169,6 @@ const adminEventController = {
         WHERE id = ? AND status_deleted = 0
       `;
 
-      console.log('Executing update query:', query, 'with params:', [status, id]);
       const [result] = await db.execute(query, [status, id]);
 
       if (result.affectedRows === 0) {
@@ -211,13 +178,11 @@ const adminEventController = {
         });
       }
 
-      console.log('Status updated successfully');
       res.json({
         success: true,
         message: 'Status event berhasil diperbarui'
       });
     } catch (error) {
-      console.error('Error in updateStatus:', error);
       res.status(500).json({
         success: false,
         message: 'Terjadi kesalahan server'
@@ -282,7 +247,6 @@ const adminEventController = {
         }
       });
     } catch (error) {
-      console.error('Error in createEvent:', error);
       res.status(500).json({
         success: false,
         message: 'Terjadi kesalahan server'
@@ -352,7 +316,6 @@ const adminEventController = {
         }
       });
     } catch (error) {
-      console.error('Error in updateEvent:', error);
       res.status(500).json({
         success: false,
         message: 'Terjadi kesalahan server'
@@ -390,7 +353,6 @@ const adminEventController = {
         message: 'Event berhasil dihapus'
       });
     } catch (error) {
-      console.error('Error in deleteEvent:', error);
       res.status(500).json({
         success: false,
         message: 'Terjadi kesalahan server'
@@ -431,8 +393,7 @@ const adminEventController = {
         success: true,
         data: event
       });
-    } catch (error) {
-      console.error('Error in getEventById:', error);
+    } catch (error) { 
       res.status(500).json({
         success: false,
         message: 'Terjadi kesalahan server'
@@ -457,7 +418,6 @@ const adminEventController = {
         data: results
       });
     } catch (error) {
-      console.error('Error in getAllUsers:', error);
       res.status(500).json({
         success: false,
         message: 'Terjadi kesalahan server'

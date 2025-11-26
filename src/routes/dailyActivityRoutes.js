@@ -38,13 +38,20 @@ const handleMulterError = (err, req, res, next) => {
   next();
 };
 
-// Daily activity routes
+// PENTING: Route supervisi HARUS di atas route /:id
+// Endpoint khusus untuk supervisi (tanpa validasi client)
+router.get('/supervisi/list', DailyActivityController.getSupervisiDailyActivities);
+router.post('/supervisi/create', upload.array('dokumentasi', 10), handleMulterError, DailyActivityController.createSupervisiDailyActivity);
+router.delete('/supervisi-delete/:id', DailyActivityController.deleteSupervisiDailyActivity);
+router.get('/supervisi/:id', DailyActivityController.getSupervisiDailyActivityById);
+router.post('/:id/komentar/supervisi', DailyActivityController.addSupervisiComment);
+
+// General routes untuk sales
 router.get('/', DailyActivityController.getAllDailyActivities);
 router.get('/:id', DailyActivityController.getDailyActivityById);
 router.post('/', upload.array('dokumentasi', 10), handleMulterError, DailyActivityController.createDailyActivity);
 router.put('/:id', upload.array('dokumentasi', 10), handleMulterError, DailyActivityController.updateDailyActivity);
 router.delete('/:id', DailyActivityController.deleteDailyActivity);
-// Tambahkan endpoint baru untuk komentar
 router.post('/:id/komentar', DailyActivityController.addComment);
 
 module.exports = router;
