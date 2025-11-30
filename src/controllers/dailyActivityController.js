@@ -2,6 +2,7 @@ const db = require('../config/database');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { sendNotificationToMasters } = require('../helpers/notificationHelper');
 
 // Ensure upload directory exists
 const uploadDir = path.join(process.cwd(), 'upload/dokumentasi');
@@ -416,6 +417,36 @@ class DailyActivityController {
         const activity = newActivity[0];
         activity.dokumentasi = JSON.parse(activity.dokumentasi || "[]");
         activity.komentar = JSON.parse(activity.komentar || "[]");
+
+        // Get user and client info for notification
+        const [userInfo] = await db.query(
+          'SELECT name FROM users WHERE id = ?',
+          [created_by]
+        );
+        const [clientInfo] = await db.query(
+          'SELECT nama FROM clients WHERE id = ?',
+          [pihak_bersangkutan]
+        );
+
+        const userName = userInfo[0]?.name || 'Sales';
+        const clientName = clientInfo[0]?.nama || 'Client';
+
+        // Send notification to masters (admin)
+        await sendNotificationToMasters({
+          title: 'Kunjungan Baru',
+          body: `${userName} membuat kunjungan baru untuk ${clientName} - ${perihal}`,
+          type: 'kunjungan',
+          relatedId: parseInt(result.insertId),
+          relatedType: 'DailyActivity',
+          actionUrl: `kunjungan/${result.insertId}`,
+          data: {
+            activityId: parseInt(result.insertId),
+            perihal: perihal,
+            clientName: clientName,
+            userName: userName,
+            createdBy: created_by
+          }
+        });
 
         res.status(201).json({
           success: true,
