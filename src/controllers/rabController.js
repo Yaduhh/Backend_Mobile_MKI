@@ -247,19 +247,38 @@ class RabController {
                 }
             }
 
-            // Get existing data to check if this is first time pengajuan
+            // Get existing data to compare with new data
             const [existingRabs] = await db.query(
                 'SELECT json_pengeluaran_entertaiment FROM rancangan_anggaran_biaya WHERE id = ?',
                 [id]
             );
-            const isFirstTime = !existingRabs[0]?.json_pengeluaran_entertaiment || 
-                                existingRabs[0].json_pengeluaran_entertaiment === '[]' ||
-                                existingRabs[0].json_pengeluaran_entertaiment === null;
-            
-            // Check if there are pengajuan (status "Pengajuan") in the new data
-            const hasPengajuan = cleanData.some(mr => 
-                mr.materials && mr.materials.some(mat => mat.status === 'Pengajuan')
-            );
+            let existingData = [];
+            if (existingRabs[0]?.json_pengeluaran_entertaiment) {
+                try {
+                    existingData = JSON.parse(existingRabs[0].json_pengeluaran_entertaiment) || [];
+                } catch (e) {
+                    existingData = [];
+                }
+            }
+
+            // Count pengajuan (status "Pengajuan") in existing data
+            const existingPengajuanCount = existingData.reduce((count, mr) => {
+                if (mr.materials && Array.isArray(mr.materials)) {
+                    return count + mr.materials.filter(mat => mat.status === 'Pengajuan').length;
+                }
+                return count;
+            }, 0);
+
+            // Count pengajuan (status "Pengajuan") in new data
+            const newPengajuanCount = cleanData.reduce((count, mr) => {
+                if (mr.materials && Array.isArray(mr.materials)) {
+                    return count + mr.materials.filter(mat => mat.status === 'Pengajuan').length;
+                }
+                return count;
+            }, 0);
+
+            // Check if there are new pengajuan (count increased)
+            const hasNewPengajuan = newPengajuanCount > existingPengajuanCount;
 
             // Get RAB info for notification
             const [rabInfo] = await db.query(
@@ -274,8 +293,8 @@ class RabController {
                 [JSON.stringify(cleanData), id]
             );
 
-            // Send notification to masters only if this is first time pengajuan and there are pengajuan
-            if (isFirstTime && hasPengajuan) {
+            // Send notification to masters only if there are new pengajuan
+            if (hasNewPengajuan) {
                 await sendNotificationToMasters({
                     title: 'Pengajuan Non Material Baru',
                     body: `Supervisi membuat pengajuan non material untuk proyek: ${rabProyek}`,
@@ -355,19 +374,38 @@ class RabController {
                 }
             }
 
-            // Get existing data to check if this is first time pengajuan
+            // Get existing data to compare with new data
             const [existingRabs] = await db.query(
                 'SELECT json_pengeluaran_tukang FROM rancangan_anggaran_biaya WHERE id = ?',
                 [id]
             );
-            const isFirstTime = !existingRabs[0]?.json_pengeluaran_tukang || 
-                                existingRabs[0].json_pengeluaran_tukang === '[]' ||
-                                existingRabs[0].json_pengeluaran_tukang === null;
-            
-            // Check if there are pengajuan (status "Pengajuan") in the new data
-            const hasPengajuan = cleanData.some(section => 
-                section.termin && section.termin.some(termin => termin.status === 'Pengajuan')
-            );
+            let existingData = [];
+            if (existingRabs[0]?.json_pengeluaran_tukang) {
+                try {
+                    existingData = JSON.parse(existingRabs[0].json_pengeluaran_tukang) || [];
+                } catch (e) {
+                    existingData = [];
+                }
+            }
+
+            // Count pengajuan (status "Pengajuan") in existing data
+            const existingPengajuanCount = existingData.reduce((count, section) => {
+                if (section.termin && Array.isArray(section.termin)) {
+                    return count + section.termin.filter(termin => termin.status === 'Pengajuan').length;
+                }
+                return count;
+            }, 0);
+
+            // Count pengajuan (status "Pengajuan") in new data
+            const newPengajuanCount = cleanData.reduce((count, section) => {
+                if (section.termin && Array.isArray(section.termin)) {
+                    return count + section.termin.filter(termin => termin.status === 'Pengajuan').length;
+                }
+                return count;
+            }, 0);
+
+            // Check if there are new pengajuan (count increased)
+            const hasNewPengajuan = newPengajuanCount > existingPengajuanCount;
 
             // Get RAB info for notification
             const [rabInfo] = await db.query(
@@ -382,8 +420,8 @@ class RabController {
                 [JSON.stringify(cleanData), id]
             );
 
-            // Send notification to masters only if this is first time pengajuan or there are new pengajuan
-            if (isFirstTime && hasPengajuan) {
+            // Send notification to masters only if there are new pengajuan
+            if (hasNewPengajuan) {
                 await sendNotificationToMasters({
                     title: 'Pengajuan Tukang Baru',
                     body: `Supervisi membuat pengajuan tukang untuk proyek: ${rabProyek}`,
@@ -463,19 +501,38 @@ class RabController {
                 }
             }
 
-            // Get existing data to check if this is first time pengajuan
+            // Get existing data to compare with new data
             const [existingRabs] = await db.query(
                 'SELECT json_kerja_tambah FROM rancangan_anggaran_biaya WHERE id = ?',
                 [id]
             );
-            const isFirstTime = !existingRabs[0]?.json_kerja_tambah || 
-                                existingRabs[0].json_kerja_tambah === '[]' ||
-                                existingRabs[0].json_kerja_tambah === null;
-            
-            // Check if there are pengajuan (status "Pengajuan") in the new data
-            const hasPengajuan = cleanData.some(section => 
-                section.termin && section.termin.some(termin => termin.status === 'Pengajuan')
-            );
+            let existingData = [];
+            if (existingRabs[0]?.json_kerja_tambah) {
+                try {
+                    existingData = JSON.parse(existingRabs[0].json_kerja_tambah) || [];
+                } catch (e) {
+                    existingData = [];
+                }
+            }
+
+            // Count pengajuan (status "Pengajuan") in existing data
+            const existingPengajuanCount = existingData.reduce((count, section) => {
+                if (section.termin && Array.isArray(section.termin)) {
+                    return count + section.termin.filter(termin => termin.status === 'Pengajuan').length;
+                }
+                return count;
+            }, 0);
+
+            // Count pengajuan (status "Pengajuan") in new data
+            const newPengajuanCount = cleanData.reduce((count, section) => {
+                if (section.termin && Array.isArray(section.termin)) {
+                    return count + section.termin.filter(termin => termin.status === 'Pengajuan').length;
+                }
+                return count;
+            }, 0);
+
+            // Check if there are new pengajuan (count increased)
+            const hasNewPengajuan = newPengajuanCount > existingPengajuanCount;
 
             // Get RAB info for notification
             const [rabInfo] = await db.query(
@@ -490,8 +547,8 @@ class RabController {
                 [JSON.stringify(cleanData), id]
             );
 
-            // Send notification to masters only if this is first time pengajuan or there are new pengajuan
-            if (isFirstTime && hasPengajuan) {
+            // Send notification to masters only if there are new pengajuan
+            if (hasNewPengajuan) {
                 await sendNotificationToMasters({
                     title: 'Pengajuan Kerja Tambah Baru',
                     body: `Supervisi membuat pengajuan kerja tambah untuk proyek: ${rabProyek}`,
@@ -574,19 +631,38 @@ class RabController {
                 }
             }
 
-            // Get existing data to check if this is first time pengajuan
+            // Get existing data to compare with new data
             const [existingRabs] = await db.query(
                 'SELECT json_pengeluaran_material_tambahan FROM rancangan_anggaran_biaya WHERE id = ?',
                 [id]
             );
-            const isFirstTime = !existingRabs[0]?.json_pengeluaran_material_tambahan || 
-                                existingRabs[0].json_pengeluaran_material_tambahan === '[]' ||
-                                existingRabs[0].json_pengeluaran_material_tambahan === null;
-            
-            // Check if there are pengajuan (status "Pengajuan") in the new data
-            const hasPengajuan = cleanData.some(mr => 
-                mr.materials && mr.materials.some(mat => mat.status === 'Pengajuan')
-            );
+            let existingData = [];
+            if (existingRabs[0]?.json_pengeluaran_material_tambahan) {
+                try {
+                    existingData = JSON.parse(existingRabs[0].json_pengeluaran_material_tambahan) || [];
+                } catch (e) {
+                    existingData = [];
+                }
+            }
+
+            // Count pengajuan (status "Pengajuan") in existing data
+            const existingPengajuanCount = existingData.reduce((count, mr) => {
+                if (mr.materials && Array.isArray(mr.materials)) {
+                    return count + mr.materials.filter(mat => mat.status === 'Pengajuan').length;
+                }
+                return count;
+            }, 0);
+
+            // Count pengajuan (status "Pengajuan") in new data
+            const newPengajuanCount = cleanData.reduce((count, mr) => {
+                if (mr.materials && Array.isArray(mr.materials)) {
+                    return count + mr.materials.filter(mat => mat.status === 'Pengajuan').length;
+                }
+                return count;
+            }, 0);
+
+            // Check if there are new pengajuan (count increased)
+            const hasNewPengajuan = newPengajuanCount > existingPengajuanCount;
 
             // Get RAB info for notification
             const [rabInfo] = await db.query(
@@ -601,8 +677,8 @@ class RabController {
                 [JSON.stringify(cleanData), id]
             );
 
-            // Send notification to masters only if this is first time pengajuan or there are new pengajuan
-            if (isFirstTime && hasPengajuan) {
+            // Send notification to masters only if there are new pengajuan
+            if (hasNewPengajuan) {
                 await sendNotificationToMasters({
                     title: 'Pengajuan Material Tambahan Baru',
                     body: `Supervisi membuat pengajuan material tambahan untuk proyek: ${rabProyek}`,
