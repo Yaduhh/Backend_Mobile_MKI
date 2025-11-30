@@ -261,21 +261,15 @@ class AdminPengajuanController {
                                 }
 
                                 // Extract numeric value (sesuai Laravel extractNumericValue method)
+                                // Handle Indonesian format: "Rp 2.500.000" (dots as thousands separator)
                                 const extractNumericValue = (value) => {
                                     if (typeof value === 'number') {
                                         return parseFloat(value) || 0;
                                     }
                                     if (typeof value === 'string') {
-                                        // Remove Rp, spaces, and commas
-                                        let cleanValue = value.replace(/Rp|[\s,]/g, '');
-                                        // Handle dots (thousands separator or decimal)
-                                        if (cleanValue.includes('.')) {
-                                            const parts = cleanValue.split('.');
-                                            if (parts.length === 2 && parts[1].length === 3) {
-                                                // Likely thousands separator
-                                                cleanValue = cleanValue.replace(/\./g, '');
-                                            }
-                                        }
+                                        // Remove Rp, spaces, commas, and ALL dots (Indonesian uses dots as thousands separator)
+                                        // Format: "Rp 2.500.000" -> "2500000"
+                                        let cleanValue = value.replace(/Rp|[\s,]/g, '').replace(/\./g, '');
                                         return cleanValue ? parseFloat(cleanValue) || 0 : 0;
                                     }
                                     return 0;
