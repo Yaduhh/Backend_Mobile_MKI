@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { sendNotificationToMasters } = require('../helpers/notificationHelper');
 
 class RabController {
     /**
@@ -246,11 +247,33 @@ class RabController {
                 }
             }
 
+            // Get RAB info for notification
+            const [rabInfo] = await db.query(
+                'SELECT proyek, pekerjaan FROM rancangan_anggaran_biaya WHERE id = ?',
+                [id]
+            );
+            const rabProyek = rabInfo[0]?.proyek || 'RAB';
+
             // Update RAB
             await db.query(
                 'UPDATE rancangan_anggaran_biaya SET json_pengeluaran_entertaiment = ? WHERE id = ?',
                 [JSON.stringify(cleanData), id]
             );
+
+            // Send notification to masters
+            await sendNotificationToMasters({
+                title: 'Pengajuan Non Material Baru',
+                body: `Supervisi membuat pengajuan non material untuk proyek: ${rabProyek}`,
+                type: 'pengajuan',
+                relatedId: parseInt(id),
+                relatedType: 'RancanganAnggaranBiaya',
+                actionUrl: `pengajuan/entertainment/${id}`,
+                data: {
+                    pengajuanType: 'non_material',
+                    rabId: parseInt(id),
+                    rabProyek: rabProyek
+                }
+            });
 
             res.json({
                 status: 'success',
@@ -316,11 +339,33 @@ class RabController {
                 }
             }
 
+            // Get RAB info for notification
+            const [rabInfo] = await db.query(
+                'SELECT proyek, pekerjaan FROM rancangan_anggaran_biaya WHERE id = ?',
+                [id]
+            );
+            const rabProyek = rabInfo[0]?.proyek || 'RAB';
+
             // Update RAB
             await db.query(
                 'UPDATE rancangan_anggaran_biaya SET json_pengeluaran_tukang = ? WHERE id = ?',
                 [JSON.stringify(cleanData), id]
             );
+
+            // Send notification to masters
+            await sendNotificationToMasters({
+                title: 'Pengajuan Tukang Baru',
+                body: `Supervisi membuat pengajuan tukang untuk proyek: ${rabProyek}`,
+                type: 'pengajuan',
+                relatedId: parseInt(id),
+                relatedType: 'RancanganAnggaranBiaya',
+                actionUrl: `pengajuan/tukang/${id}`,
+                data: {
+                    pengajuanType: 'tukang',
+                    rabId: parseInt(id),
+                    rabProyek: rabProyek
+                }
+            });
 
             res.json({
                 status: 'success',
@@ -386,11 +431,33 @@ class RabController {
                 }
             }
 
+            // Get RAB info for notification
+            const [rabInfo] = await db.query(
+                'SELECT proyek, pekerjaan FROM rancangan_anggaran_biaya WHERE id = ?',
+                [id]
+            );
+            const rabProyek = rabInfo[0]?.proyek || 'RAB';
+
             // Update RAB
             await db.query(
                 'UPDATE rancangan_anggaran_biaya SET json_kerja_tambah = ? WHERE id = ?',
                 [JSON.stringify(cleanData), id]
             );
+
+            // Send notification to masters
+            await sendNotificationToMasters({
+                title: 'Pengajuan Kerja Tambah Baru',
+                body: `Supervisi membuat pengajuan kerja tambah untuk proyek: ${rabProyek}`,
+                type: 'pengajuan',
+                relatedId: parseInt(id),
+                relatedType: 'RancanganAnggaranBiaya',
+                actionUrl: `pengajuan/kerja-tambah/${id}`,
+                data: {
+                    pengajuanType: 'kerja_tambah',
+                    rabId: parseInt(id),
+                    rabProyek: rabProyek
+                }
+            });
 
             res.json({
                 status: 'success',
@@ -459,11 +526,33 @@ class RabController {
                 }
             }
 
+            // Get RAB info for notification
+            const [rabInfo] = await db.query(
+                'SELECT proyek, pekerjaan FROM rancangan_anggaran_biaya WHERE id = ?',
+                [id]
+            );
+            const rabProyek = rabInfo[0]?.proyek || 'RAB';
+
             // Update RAB
             await db.query(
                 'UPDATE rancangan_anggaran_biaya SET json_pengeluaran_material_tambahan = ? WHERE id = ?',
                 [JSON.stringify(cleanData), id]
             );
+
+            // Send notification to masters
+            await sendNotificationToMasters({
+                title: 'Pengajuan Material Tambahan Baru',
+                body: `Supervisi membuat pengajuan material tambahan untuk proyek: ${rabProyek}`,
+                type: 'pengajuan',
+                relatedId: parseInt(id),
+                relatedType: 'RancanganAnggaranBiaya',
+                actionUrl: `pengajuan/material-tambahan/${id}`,
+                data: {
+                    pengajuanType: 'material_tambahan',
+                    rabId: parseInt(id),
+                    rabProyek: rabProyek
+                }
+            });
 
             res.json({
                 status: 'success',

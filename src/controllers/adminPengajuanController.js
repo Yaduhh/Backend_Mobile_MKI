@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { sendNotificationToUser } = require('../helpers/notificationHelper');
 
 class AdminPengajuanController {
     /**
@@ -119,9 +120,12 @@ class AdminPengajuanController {
                 });
             }
 
-            // Get RAB
+            // Get RAB with supervisi info
             const [rabs] = await db.query(
-                'SELECT json_pengeluaran_entertaiment FROM rancangan_anggaran_biaya WHERE id = ? AND status_deleted = 0',
+                `SELECT rab.json_pengeluaran_entertaiment, rab.proyek, rab.supervisi_id, u.name as supervisi_name
+                 FROM rancangan_anggaran_biaya rab
+                 LEFT JOIN users u ON rab.supervisi_id = u.id
+                 WHERE rab.id = ? AND rab.status_deleted = 0`,
                 [id]
             );
 
@@ -132,10 +136,13 @@ class AdminPengajuanController {
                 });
             }
 
+            const rab = rabs[0];
+            const materialItem = null;
+
             // Parse JSON
             let entertainmentData = [];
             try {
-                entertainmentData = JSON.parse(rabs[0].json_pengeluaran_entertaiment) || [];
+                entertainmentData = JSON.parse(rab.json_pengeluaran_entertaiment) || [];
             } catch (e) {
                 entertainmentData = [];
             }
@@ -145,13 +152,35 @@ class AdminPengajuanController {
                 entertainmentData[entertainment_index].materials &&
                 entertainmentData[entertainment_index].materials[material_index]) {
 
-                entertainmentData[entertainment_index].materials[material_index].status = status;
+                const material = entertainmentData[entertainment_index].materials[material_index];
+                material.status = status;
 
                 // Update database
                 await db.query(
                     'UPDATE rancangan_anggaran_biaya SET json_pengeluaran_entertaiment = ? WHERE id = ?',
                     [JSON.stringify(entertainmentData), id]
                 );
+
+                // Send notification to supervisi if status changed to Disetujui or Ditolak
+                if (rab.supervisi_id && (status === 'Disetujui' || status === 'Ditolak')) {
+                    const statusText = status === 'Disetujui' ? 'disetujui' : 'ditolak';
+                    await sendNotificationToUser({
+                        userId: rab.supervisi_id,
+                        title: `Pengajuan Non Material ${statusText.charAt(0).toUpperCase() + statusText.slice(1)}`,
+                        body: `Pengajuan non material "${material.item || 'Material'}" untuk proyek ${rab.proyek || 'RAB'} telah ${statusText}`,
+                        type: 'pengajuan',
+                        relatedId: parseInt(id),
+                        relatedType: 'RancanganAnggaranBiaya',
+                        actionUrl: `rab/${id}`,
+                        data: {
+                            pengajuanType: 'non_material',
+                            rabId: parseInt(id),
+                            rabProyek: rab.proyek,
+                            status: status,
+                            materialItem: material.item
+                        }
+                    });
+                }
 
                 res.json({
                     status: 'success',
@@ -310,7 +339,10 @@ class AdminPengajuanController {
             }
 
             const [rabs] = await db.query(
-                'SELECT json_pengeluaran_material_tambahan FROM rancangan_anggaran_biaya WHERE id = ? AND status_deleted = 0',
+                `SELECT rab.json_pengeluaran_material_tambahan, rab.proyek, rab.supervisi_id, u.name as supervisi_name
+                 FROM rancangan_anggaran_biaya rab
+                 LEFT JOIN users u ON rab.supervisi_id = u.id
+                 WHERE rab.id = ? AND rab.status_deleted = 0`,
                 [id]
             );
 
@@ -321,9 +353,11 @@ class AdminPengajuanController {
                 });
             }
 
+            const rab = rabs[0];
+
             let materialData = [];
             try {
-                materialData = JSON.parse(rabs[0].json_pengeluaran_material_tambahan) || [];
+                materialData = JSON.parse(rab.json_pengeluaran_material_tambahan) || [];
             } catch (e) {
                 materialData = [];
             }
@@ -332,12 +366,34 @@ class AdminPengajuanController {
                 materialData[material_tambahan_index].materials &&
                 materialData[material_tambahan_index].materials[material_index]) {
 
-                materialData[material_tambahan_index].materials[material_index].status = status;
+                const material = materialData[material_tambahan_index].materials[material_index];
+                material.status = status;
 
                 await db.query(
                     'UPDATE rancangan_anggaran_biaya SET json_pengeluaran_material_tambahan = ? WHERE id = ?',
                     [JSON.stringify(materialData), id]
                 );
+
+                // Send notification to supervisi if status changed to Disetujui or Ditolak
+                if (rab.supervisi_id && (status === 'Disetujui' || status === 'Ditolak')) {
+                    const statusText = status === 'Disetujui' ? 'disetujui' : 'ditolak';
+                    await sendNotificationToUser({
+                        userId: rab.supervisi_id,
+                        title: `Pengajuan Material Tambahan ${statusText.charAt(0).toUpperCase() + statusText.slice(1)}`,
+                        body: `Pengajuan material tambahan "${material.item || 'Material'}" untuk proyek ${rab.proyek || 'RAB'} telah ${statusText}`,
+                        type: 'pengajuan',
+                        relatedId: parseInt(id),
+                        relatedType: 'RancanganAnggaranBiaya',
+                        actionUrl: `rab/${id}`,
+                        data: {
+                            pengajuanType: 'material_tambahan',
+                            rabId: parseInt(id),
+                            rabProyek: rab.proyek,
+                            status: status,
+                            materialItem: material.item
+                        }
+                    });
+                }
 
                 res.json({
                     status: 'success',
@@ -472,7 +528,10 @@ class AdminPengajuanController {
             }
 
             const [rabs] = await db.query(
-                'SELECT json_pengeluaran_tukang FROM rancangan_anggaran_biaya WHERE id = ? AND status_deleted = 0',
+                `SELECT rab.json_pengeluaran_tukang, rab.proyek, rab.supervisi_id, u.name as supervisi_name
+                 FROM rancangan_anggaran_biaya rab
+                 LEFT JOIN users u ON rab.supervisi_id = u.id
+                 WHERE rab.id = ? AND rab.status_deleted = 0`,
                 [id]
             );
 
@@ -483,9 +542,11 @@ class AdminPengajuanController {
                 });
             }
 
+            const rab = rabs[0];
+
             let tukangData = [];
             try {
-                tukangData = JSON.parse(rabs[0].json_pengeluaran_tukang) || [];
+                tukangData = JSON.parse(rab.json_pengeluaran_tukang) || [];
             } catch (e) {
                 tukangData = [];
             }
@@ -494,12 +555,35 @@ class AdminPengajuanController {
                 tukangData[section_index].termin &&
                 tukangData[section_index].termin[termin_index]) {
 
-                tukangData[section_index].termin[termin_index].status = status;
+                const termin = tukangData[section_index].termin[termin_index];
+                termin.status = status;
 
                 await db.query(
                     'UPDATE rancangan_anggaran_biaya SET json_pengeluaran_tukang = ? WHERE id = ?',
                     [JSON.stringify(tukangData), id]
                 );
+
+                // Send notification to supervisi if status changed to Disetujui or Ditolak
+                if (rab.supervisi_id && (status === 'Disetujui' || status === 'Ditolak')) {
+                    const statusText = status === 'Disetujui' ? 'disetujui' : 'ditolak';
+                    await sendNotificationToUser({
+                        userId: rab.supervisi_id,
+                        title: `Pengajuan Tukang ${statusText.charAt(0).toUpperCase() + statusText.slice(1)}`,
+                        body: `Pengajuan tukang (Termin ${termin_index + 1}) untuk proyek ${rab.proyek || 'RAB'} telah ${statusText}`,
+                        type: 'pengajuan',
+                        relatedId: parseInt(id),
+                        relatedType: 'RancanganAnggaranBiaya',
+                        actionUrl: `rab/${id}`,
+                        data: {
+                            pengajuanType: 'tukang',
+                            rabId: parseInt(id),
+                            rabProyek: rab.proyek,
+                            status: status,
+                            terminIndex: termin_index + 1,
+                            kredit: termin.kredit
+                        }
+                    });
+                }
 
                 res.json({
                     status: 'success',
@@ -624,7 +708,10 @@ class AdminPengajuanController {
             }
 
             const [rabs] = await db.query(
-                'SELECT json_kerja_tambah FROM rancangan_anggaran_biaya WHERE id = ? AND status_deleted = 0',
+                `SELECT rab.json_kerja_tambah, rab.proyek, rab.supervisi_id, u.name as supervisi_name
+                 FROM rancangan_anggaran_biaya rab
+                 LEFT JOIN users u ON rab.supervisi_id = u.id
+                 WHERE rab.id = ? AND rab.status_deleted = 0`,
                 [id]
             );
 
@@ -635,19 +722,25 @@ class AdminPengajuanController {
                 });
             }
 
+            const rab = rabs[0];
+
             let kerjaTambahData = [];
             try {
-                kerjaTambahData = JSON.parse(rabs[0].json_kerja_tambah) || [];
+                kerjaTambahData = JSON.parse(rab.json_kerja_tambah) || [];
             } catch (e) {
                 kerjaTambahData = [];
             }
 
             let updated = false;
-            for (let section of kerjaTambahData) {
+            let terminIndex = 0;
+            for (let sectionIndex = 0; sectionIndex < kerjaTambahData.length; sectionIndex++) {
+                const section = kerjaTambahData[sectionIndex];
                 if (section.termin && Array.isArray(section.termin)) {
-                    for (let termin of section.termin) {
+                    for (let i = 0; i < section.termin.length; i++) {
+                        const termin = section.termin[i];
                         if (termin.tanggal === tanggal && parseFloat(termin.kredit) == parseFloat(kredit)) {
                             termin.status = status;
+                            terminIndex = i + 1;
                             updated = true;
                             break;
                         }
@@ -661,6 +754,28 @@ class AdminPengajuanController {
                     'UPDATE rancangan_anggaran_biaya SET json_kerja_tambah = ? WHERE id = ?',
                     [JSON.stringify(kerjaTambahData), id]
                 );
+
+                // Send notification to supervisi if status changed to Disetujui or Ditolak
+                if (rab.supervisi_id && (status === 'Disetujui' || status === 'Ditolak')) {
+                    const statusText = status === 'Disetujui' ? 'disetujui' : 'ditolak';
+                    await sendNotificationToUser({
+                        userId: rab.supervisi_id,
+                        title: `Pengajuan Kerja Tambah ${statusText.charAt(0).toUpperCase() + statusText.slice(1)}`,
+                        body: `Pengajuan kerja tambah (Termin ${terminIndex}) untuk proyek ${rab.proyek || 'RAB'} telah ${statusText}`,
+                        type: 'pengajuan',
+                        relatedId: parseInt(id),
+                        relatedType: 'RancanganAnggaranBiaya',
+                        actionUrl: `rab/${id}`,
+                        data: {
+                            pengajuanType: 'kerja_tambah',
+                            rabId: parseInt(id),
+                            rabProyek: rab.proyek,
+                            status: status,
+                            terminIndex: terminIndex,
+                            kredit: kredit
+                        }
+                    });
+                }
 
                 res.json({
                     status: 'success',

@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "@react-navigation/bottom-tabs": "^6.5.11",
+    "axios": "^1.13.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
