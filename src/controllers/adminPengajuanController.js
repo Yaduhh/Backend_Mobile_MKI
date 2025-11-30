@@ -171,11 +171,9 @@ class AdminPengajuanController {
                     [JSON.stringify(entertainmentData), id]
                 );
 
-                // Send notification to supervisi only if status changed to Disetujui or Ditolak
-                // and old status was not already Disetujui or Ditolak
-                if (rab.supervisi_id && 
-                    (status === 'Disetujui' || status === 'Ditolak') &&
-                    oldStatus !== 'Disetujui' && oldStatus !== 'Ditolak') {
+                // Send notification to supervisi if status changed to Disetujui or Ditolak
+                // (only send if status actually changed, which is already checked above)
+                if (rab.supervisi_id && (status === 'Disetujui' || status === 'Ditolak')) {
                     const statusText = status === 'Disetujui' ? 'disetujui' : 'ditolak';
                     await sendNotificationToUser({
                         userId: rab.supervisi_id,
@@ -397,11 +395,9 @@ class AdminPengajuanController {
                     [JSON.stringify(materialData), id]
                 );
 
-                // Send notification to supervisi only if status changed to Disetujui or Ditolak
-                // and old status was not already Disetujui or Ditolak
-                if (rab.supervisi_id && 
-                    (status === 'Disetujui' || status === 'Ditolak') &&
-                    oldStatus !== 'Disetujui' && oldStatus !== 'Ditolak') {
+                // Send notification to supervisi if status changed to Disetujui or Ditolak
+                // (only send if status actually changed, which is already checked above)
+                if (rab.supervisi_id && (status === 'Disetujui' || status === 'Ditolak')) {
                     const statusText = status === 'Disetujui' ? 'disetujui' : 'ditolak';
                     await sendNotificationToUser({
                         userId: rab.supervisi_id,
@@ -599,11 +595,9 @@ class AdminPengajuanController {
                     [JSON.stringify(tukangData), id]
                 );
 
-                // Send notification to supervisi only if status changed to Disetujui or Ditolak
-                // and old status was not already Disetujui or Ditolak
-                if (rab.supervisi_id && 
-                    (status === 'Disetujui' || status === 'Ditolak') &&
-                    oldStatus !== 'Disetujui' && oldStatus !== 'Ditolak') {
+                // Send notification to supervisi if status changed to Disetujui or Ditolak
+                // (only send if status actually changed, which is already checked above)
+                if (rab.supervisi_id && (status === 'Disetujui' || status === 'Ditolak')) {
                     const statusText = status === 'Disetujui' ? 'disetujui' : 'ditolak';
                     await sendNotificationToUser({
                         userId: rab.supervisi_id,
@@ -805,11 +799,9 @@ class AdminPengajuanController {
                     [JSON.stringify(kerjaTambahData), id]
                 );
 
-                // Send notification to supervisi only if status changed to Disetujui or Ditolak
-                // and old status was not already Disetujui or Ditolak
-                if (rab.supervisi_id && 
-                    (status === 'Disetujui' || status === 'Ditolak') &&
-                    oldStatus !== 'Disetujui' && oldStatus !== 'Ditolak') {
+                // Send notification to supervisi if status changed to Disetujui or Ditolak
+                // (only send if status actually changed, which is already checked above)
+                if (rab.supervisi_id && (status === 'Disetujui' || status === 'Ditolak')) {
                     const statusText = status === 'Disetujui' ? 'disetujui' : 'ditolak';
                     await sendNotificationToUser({
                         userId: rab.supervisi_id,
