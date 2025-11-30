@@ -34,7 +34,7 @@ app.use('/upload/profiles', express.static(require('path').join(process.cwd(), '
 app.get('/', (req, res) => {
   res.json({
     status: 'success',
-    message: 'Backend Mobile MKI sudah berjalan!'
+    message: 'Backend Mobile MKI Terbaru V1 sudah berjalan!'
   });
 });
 app.use('/api/auth', authRoutes);
