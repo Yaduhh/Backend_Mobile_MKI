@@ -43,6 +43,17 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Ignore semua file json
+*.json
+
+# PENGECUALIAN (JANGAN DIHAPUS):
+# File-file ini wajib ada supaya project bisa jalan/install
+!package.json
+!package-lock.json
+!app.json
+!tsconfig.json
+!eas.json
+
 # Upload directories (optional - uncomment if you don't want to track uploads)
 # upload/
 upload/dokumentasi/

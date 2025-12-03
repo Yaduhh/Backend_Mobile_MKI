@@ -123,7 +123,8 @@ class AdminRabController {
                     s.email as supervisi_email,
                     p.nomor_penawaran,
                     p.total as penawaran_total,
-                    pem.nomor_pemasangan
+                    pem.nomor_pemasangan,
+                    pem.json_pemasangan as pemasangan_json
                 FROM rancangan_anggaran_biaya rab
                 LEFT JOIN users u ON rab.created_by = u.id
                 LEFT JOIN users s ON rab.supervisi_id = s.id
@@ -165,6 +166,41 @@ class AdminRabController {
                 }
             });
 
+            // Parse pemasangan json dan hitung total dari table pemasangan
+            let pemasanganTotal = 0;
+            if (rab.pemasangan_json) {
+                try {
+                    const pemasanganData = JSON.parse(rab.pemasangan_json);
+                    // Struktur json_pemasangan: array of sections, setiap section punya items
+                    if (Array.isArray(pemasanganData)) {
+                        pemasanganData.forEach((section) => {
+                            if (section.items && Array.isArray(section.items)) {
+                                section.items.forEach((item) => {
+                                    // Hitung dari total_harga atau qty * harga_satuan
+                                    let itemTotal = 0;
+                                    if (item.total_harga) {
+                                        itemTotal = typeof item.total_harga === 'string'
+                                            ? parseFloat(item.total_harga.replace(/[^\d]/g, '')) || 0
+                                            : (parseFloat(item.total_harga) || 0);
+                                    } else if (item.qty && item.harga_satuan) {
+                                        const qty = typeof item.qty === 'string'
+                                            ? parseFloat(item.qty.replace(/[^\d]/g, '')) || 0
+                                            : (parseFloat(item.qty) || 0);
+                                        const harga = typeof item.harga_satuan === 'string'
+                                            ? parseFloat(item.harga_satuan.replace(/[^\d]/g, '')) || 0
+                                            : (parseFloat(item.harga_satuan) || 0);
+                                        itemTotal = qty * harga;
+                                    }
+                                    pemasanganTotal += itemTotal;
+                                });
+                            }
+                        });
+                    }
+                } catch (e) {
+                    // Ignore parse error
+                }
+            }
+
             // Format response with relationships
             const formattedRab = {
                 ...rab,
@@ -185,7 +221,8 @@ class AdminRabController {
                 } : null,
                 pemasangan: rab.nomor_pemasangan ? {
                     id: rab.pemasangan_id,
-                    nomor_pemasangan: rab.nomor_pemasangan
+                    nomor_pemasangan: rab.nomor_pemasangan,
+                    total: pemasanganTotal
                 } : null
             };
 
@@ -194,6 +231,7 @@ class AdminRabController {
             delete formattedRab.created_by_email;
             delete formattedRab.supervisi_name;
             delete formattedRab.supervisi_email;
+            delete formattedRab.pemasangan_json;
             delete formattedRab.nomor_penawaran;
             delete formattedRab.penawaran_total;
             delete formattedRab.nomor_pemasangan;
