@@ -14,6 +14,8 @@ const adminArsipFileRoutes = require('./src/routes/adminArsipFileRoutes');
 const adminEventRoutes = require('./src/routes/adminEventRoutes');
 const adminPengajuanRoutes = require('./src/routes/adminPengajuanRoutes');
 const adminRabRoutes = require('./src/routes/adminRabRoutes');
+const adminPenawaranRoutes = require('./src/routes/adminPenawaranRoutes');
+const adminPemasanganRoutes = require('./src/routes/adminPemasanganRoutes');
 const rabRoutes = require('./src/routes/rabRoutes');
 const notificationRoutes = require('./src/routes/notificationRoutes');
 
@@ -50,6 +52,8 @@ app.use('/api/admin/arsip-files', adminArsipFileRoutes);
 app.use('/api/admin/events', adminEventRoutes);
 app.use('/api/admin/pengajuan', adminPengajuanRoutes);
 app.use('/api/admin/rancangan-anggaran-biaya', adminRabRoutes);
+app.use('/api/admin/penawaran', adminPenawaranRoutes);
+app.use('/api/admin/pemasangan', adminPemasanganRoutes);
 app.use('/api/supervisi', rabRoutes);
 app.use('/api/notifications', notificationRoutes);
 
