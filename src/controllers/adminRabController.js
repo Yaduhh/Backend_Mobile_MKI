@@ -151,7 +151,9 @@ class AdminRabController {
                 'json_pengeluaran_tukang',
                 'json_kerja_tambah',
                 'json_pengeluaran_material_tambahan',
-                'json_pengeluaran_pemasangan'
+                'json_pengeluaran_pemasangan',
+                'json_section_material_pendukung',
+                'json_pengajuan_harga_tukang'
             ];
 
             jsonFields.forEach(field => {

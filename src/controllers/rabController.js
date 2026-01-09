@@ -160,6 +160,11 @@ class RabController {
 
             const rab = rabs[0];
 
+            console.log('=== GET RAB DETAIL START ===');
+            console.log('RAB ID:', id);
+            console.log('Raw json_pengajuan_harga_tukang from DB:', rab.json_pengajuan_harga_tukang);
+            console.log('Type:', typeof rab.json_pengajuan_harga_tukang);
+
             // Parse JSON fields
             const jsonFields = [
                 'json_pengeluaran_material_utama',
@@ -168,29 +173,45 @@ class RabController {
                 'json_pengeluaran_tukang',
                 'json_kerja_tambah',
                 'json_pengeluaran_material_tambahan',
-                'json_pengeluaran_pemasangan'
+                'json_pengeluaran_pemasangan',
+                'json_pengajuan_harga_tukang',
+                'json_section_material_pendukung'
             ];
 
             jsonFields.forEach(field => {
                 if (rab[field]) {
                     try {
-                        rab[field] = JSON.parse(rab[field]);
+                        const parsed = typeof rab[field] === 'string' ? JSON.parse(rab[field]) : rab[field];
+                        rab[field] = parsed;
+                        if (field === 'json_pengajuan_harga_tukang') {
+                            console.log('Parsed json_pengajuan_harga_tukang:', JSON.stringify(parsed, null, 2));
+                            console.log('Is array:', Array.isArray(parsed));
+                            console.log('Count:', Array.isArray(parsed) ? parsed.length : 'N/A');
+                        }
                     } catch (e) {
+                        console.error(`Error parsing ${field}:`, e.message);
                         rab[field] = [];
                     }
                 } else {
                     rab[field] = [];
+                    if (field === 'json_pengajuan_harga_tukang') {
+                        console.log('json_pengajuan_harga_tukang is empty/null');
+                    }
                 }
             });
 
             // Parse pemasangan json dan hitung total dari table pemasangan
             let pemasanganTotal = 0;
+            let parsedPemasanganJson = null;
             if (rab.pemasangan_json) {
                 try {
-                    const pemasanganData = JSON.parse(rab.pemasangan_json);
+                    parsedPemasanganJson = typeof rab.pemasangan_json === 'string' 
+                        ? JSON.parse(rab.pemasangan_json) 
+                        : rab.pemasangan_json;
+                    
                     // Struktur json_pemasangan: array of sections, setiap section punya items
-                    if (Array.isArray(pemasanganData)) {
-                        pemasanganData.forEach((section) => {
+                    if (Array.isArray(parsedPemasanganJson)) {
+                        parsedPemasanganJson.forEach((section) => {
                             if (section.items && Array.isArray(section.items)) {
                                 section.items.forEach((item) => {
                                     // Hitung dari total_harga atau qty * harga_satuan
@@ -214,7 +235,8 @@ class RabController {
                         });
                     }
                 } catch (e) {
-                    // Ignore parse error
+                    console.error('Error parsing pemasangan_json:', e);
+                    parsedPemasanganJson = [];
                 }
             }
 
@@ -224,12 +246,24 @@ class RabController {
                 pemasangan: rab.nomor_pemasangan ? {
                     id: rab.pemasangan_id,
                     nomor_pemasangan: rab.nomor_pemasangan,
-                    total: pemasanganTotal
+                    total: pemasanganTotal,
+                    json_pemasangan: parsedPemasanganJson || []
                 } : null
             };
 
             // Remove duplicate fields
             delete formattedRab.pemasangan_json;
+
+            console.log('Formatted RAB response - json_pengajuan_harga_tukang:', 
+                JSON.stringify(formattedRab.json_pengajuan_harga_tukang, null, 2));
+            console.log('Formatted RAB response - pemasangan:', 
+                formattedRab.pemasangan ? {
+                    id: formattedRab.pemasangan.id,
+                    nomor_pemasangan: formattedRab.pemasangan.nomor_pemasangan,
+                    total: formattedRab.pemasangan.total,
+                    json_pemasangan_count: formattedRab.pemasangan.json_pemasangan?.length || 0
+                } : 'null');
+            console.log('=== GET RAB DETAIL SUCCESS ===');
 
             res.json({
                 status: 'success',
@@ -368,6 +402,100 @@ class RabController {
 
         } catch (error) {
             console.error('Update entertainment error:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Terjadi kesalahan pada server',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Update harga tukang
+     */
+    static async updateHargaTukang(req, res) {
+        try {
+            const { id } = req.params;
+            const supervisiId = req.user.id;
+            const { json_pengajuan_harga_tukang } = req.body;
+
+            console.log('=== UPDATE HARGA TUKANG START ===');
+            console.log('RAB ID:', id);
+            console.log('Supervisi ID:', supervisiId);
+            console.log('Request body:', JSON.stringify(req.body, null, 2));
+            console.log('json_pengajuan_harga_tukang type:', typeof json_pengajuan_harga_tukang);
+            console.log('json_pengajuan_harga_tukang value:', JSON.stringify(json_pengajuan_harga_tukang, null, 2));
+
+            // Verify RAB belongs to this supervisi
+            const [rabs] = await db.query(
+                'SELECT id FROM rancangan_anggaran_biaya WHERE id = ? AND supervisi_id = ? AND status_deleted = 0',
+                [id, supervisiId]
+            );
+
+            if (rabs.length === 0) {
+                console.log('RAB not found or no access');
+                return res.status(404).json({
+                    status: 'error',
+                    message: 'RAB tidak ditemukan atau Anda tidak memiliki akses'
+                });
+            }
+
+            // Clean and validate data
+            const cleanData = [];
+            if (Array.isArray(json_pengajuan_harga_tukang)) {
+                console.log('Processing array with', json_pengajuan_harga_tukang.length, 'items');
+                for (const item of json_pengajuan_harga_tukang) {
+                    console.log('Processing item:', JSON.stringify(item, null, 2));
+                    
+                    if (item.item && item.harga_satuan) {
+                        // Handle both number and string format
+                        const hargaSatuan = typeof item.harga_satuan === 'number' 
+                            ? item.harga_satuan 
+                            : (parseFloat(item.harga_satuan) || 0);
+                        const qty = parseFloat(item.qty) || 0;
+                        const totalHarga = Math.round(hargaSatuan * qty);
+
+                        const cleanItem = {
+                            item: item.item || '',
+                            satuan: item.satuan || '',
+                            qty: parseFloat(qty).toFixed(2), // String dengan 2 desimal
+                            harga_satuan: hargaSatuan, // Number
+                            total_harga: totalHarga, // Number
+                            status: 'Pengajuan' // Always Pengajuan
+                        };
+                        
+                        console.log('Clean item:', JSON.stringify(cleanItem, null, 2));
+                        cleanData.push(cleanItem);
+                    } else {
+                        console.log('Skipping item - missing item or harga_satuan:', item);
+                    }
+                }
+            } else {
+                console.log('json_pengajuan_harga_tukang is not an array:', typeof json_pengajuan_harga_tukang);
+            }
+
+            console.log('Clean data to save:', JSON.stringify(cleanData, null, 2));
+            console.log('Clean data count:', cleanData.length);
+
+            // Update RAB
+            const jsonString = JSON.stringify(cleanData);
+            console.log('JSON string to save:', jsonString);
+            
+            await db.query(
+                'UPDATE rancangan_anggaran_biaya SET json_pengajuan_harga_tukang = ? WHERE id = ?',
+                [jsonString, id]
+            );
+
+            console.log('=== UPDATE HARGA TUKANG SUCCESS ===');
+
+            res.json({
+                status: 'success',
+                message: 'Pengajuan harga tukang berhasil diperbarui',
+                data: cleanData
+            });
+
+        } catch (error) {
+            console.error('Update harga tukang error:', error);
             res.status(500).json({
                 status: 'error',
                 message: 'Terjadi kesalahan pada server',

@@ -28,6 +28,7 @@ router.get('/rab/:id', RabController.getRABDetail);
 
 // Update RAB expenses
 router.put('/rab/:id/entertainment', RabController.updateEntertainment);
+router.put('/rab/:id/harga-tukang', RabController.updateHargaTukang);
 router.put('/rab/:id/tukang', RabController.updateTukang);
 router.put('/rab/:id/kerja-tambah', RabController.updateKerjaTambah);
 router.put('/rab/:id/material-tambahan', RabController.updateMaterialTambahan);
