@@ -529,6 +529,92 @@ class AdminPengajuanController {
     }
 
     /**
+     * Get harga tukang list for admin
+     */
+    static async getHargaTukangList(req, res) {
+        try {
+            const { status_filter } = req.query;
+
+            const query = `
+                SELECT 
+                    rab.id,
+                    rab.proyek,
+                    rab.pekerjaan,
+                    rab.status as rab_status,
+                    rab.supervisi_id,
+                    rab.json_pengajuan_harga_tukang,
+                    u.name as supervisi_nama
+                FROM rancangan_anggaran_biaya rab
+                LEFT JOIN users u ON rab.supervisi_id = u.id
+                WHERE rab.json_pengajuan_harga_tukang IS NOT NULL 
+                AND rab.json_pengajuan_harga_tukang != '[]'
+                AND rab.json_pengajuan_harga_tukang != ''
+                AND rab.status != 'selesai'
+                AND rab.status_deleted = 0
+                ORDER BY rab.created_at DESC
+            `;
+
+            const [rabs] = await db.query(query);
+
+            const hargaTukangs = [];
+            rabs.forEach(rab => {
+                let jsonData = [];
+                try {
+                    jsonData = JSON.parse(rab.json_pengajuan_harga_tukang) || [];
+                } catch (e) {
+                    jsonData = [];
+                }
+
+                if (Array.isArray(jsonData)) {
+                    jsonData.forEach((item) => {
+                        // Skip data yang tidak valid
+                        if (!item.item && !item.harga_satuan) {
+                            return;
+                        }
+
+                        hargaTukangs.push({
+                            rab_id: rab.id,
+                            rab_proyek: rab.proyek,
+                            rab_pekerjaan: rab.pekerjaan,
+                            rab_status: rab.rab_status,
+                            supervisi_id: rab.supervisi_id,
+                            supervisi_nama: rab.supervisi_nama || '-',
+                            item: item.item || '-',
+                            satuan: item.satuan || '-',
+                            qty: item.qty || '0.00',
+                            harga_satuan: parseFloat(item.harga_satuan) || 0,
+                            total_harga: parseFloat(item.total_harga) || 0,
+                            status: item.status || 'Pengajuan'
+                        });
+                    });
+                }
+            });
+
+            let filteredData = hargaTukangs;
+            if (status_filter) {
+                filteredData = hargaTukangs.filter(item => item.status === status_filter);
+            }
+
+            // Sort by created_at descending (menggunakan rab.created_at)
+            // Karena tidak ada tanggal di item, kita sort berdasarkan rab order
+            // Data sudah di-order DESC dari query
+
+            res.json({
+                status: 'success',
+                hargaTukangs: filteredData
+            });
+
+        } catch (error) {
+            console.error('Get harga tukang list error:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Terjadi kesalahan pada server',
+                error: error.message
+            });
+        }
+    }
+
+    /**
      * Update tukang status
      */
     static async updateTukangStatus(req, res) {
@@ -829,6 +915,135 @@ class AdminPengajuanController {
 
         } catch (error) {
             console.error('Update kerja tambah status error:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Terjadi kesalahan pada server',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Update harga tukang status
+     */
+    static async updateHargaTukangStatus(req, res) {
+        try {
+            const { id } = req.params;
+            const { item, qty, satuan, status } = req.body;
+
+            if (!['Pengajuan', 'Disetujui', 'Ditolak'].includes(status)) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'Status tidak valid'
+                });
+            }
+
+            if (!item || !qty || !satuan) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'Item, qty, dan satuan harus diisi'
+                });
+            }
+
+            const [rabs] = await db.query(
+                `SELECT rab.json_pengajuan_harga_tukang, rab.proyek, rab.supervisi_id, u.name as supervisi_name
+                 FROM rancangan_anggaran_biaya rab
+                 LEFT JOIN users u ON rab.supervisi_id = u.id
+                 WHERE rab.id = ? AND rab.status_deleted = 0`,
+                [id]
+            );
+
+            if (rabs.length === 0) {
+                return res.status(404).json({
+                    status: 'error',
+                    message: 'RAB tidak ditemukan'
+                });
+            }
+
+            const rab = rabs[0];
+
+            let hargaTukangData = [];
+            try {
+                hargaTukangData = JSON.parse(rab.json_pengajuan_harga_tukang) || [];
+            } catch (e) {
+                hargaTukangData = [];
+            }
+
+            // Find item dengan matching item + qty + satuan (toleransi 0.01 untuk qty)
+            const normalizedItem = (item || '').trim();
+            const normalizedSatuan = (satuan || '').trim();
+            const itemQty = parseFloat(qty || 0);
+
+            let found = false;
+            for (let i = 0; i < hargaTukangData.length; i++) {
+                const existingItem = hargaTukangData[i];
+                const existingItemName = (existingItem.item || '').trim();
+                const existingSatuan = (existingItem.satuan || '').trim();
+                const existingQty = parseFloat(existingItem.qty || 0);
+
+                // Exact match untuk item name dan satuan, toleransi 0.01 untuk qty
+                if (existingItemName === normalizedItem &&
+                    existingSatuan === normalizedSatuan &&
+                    Math.abs(existingQty - itemQty) < 0.01) {
+                    
+                    const oldStatus = existingItem.status || 'Pengajuan';
+                    
+                    // Only update if status actually changed
+                    if (oldStatus === status) {
+                        return res.json({
+                            status: 'success',
+                            message: 'Status pengajuan harga tukang berhasil diperbarui'
+                        });
+                    }
+
+                    existingItem.status = status;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                return res.status(404).json({
+                    status: 'error',
+                    message: 'Data tidak ditemukan'
+                });
+            }
+
+            await db.query(
+                'UPDATE rancangan_anggaran_biaya SET json_pengajuan_harga_tukang = ? WHERE id = ?',
+                [JSON.stringify(hargaTukangData), id]
+            );
+
+            // Send notification to supervisi if status changed to Disetujui or Ditolak
+            if (rab.supervisi_id && (status === 'Disetujui' || status === 'Ditolak')) {
+                const statusText = status === 'Disetujui' ? 'disetujui' : 'ditolak';
+                await sendNotificationToUser({
+                    userId: rab.supervisi_id,
+                    title: `Pengajuan Harga Tukang ${statusText.charAt(0).toUpperCase() + statusText.slice(1)}`,
+                    body: `Pengajuan harga tukang untuk item "${item}" pada proyek ${rab.proyek || 'RAB'} telah ${statusText}`,
+                    type: 'pengajuan',
+                    relatedId: parseInt(id),
+                    relatedType: 'RancanganAnggaranBiaya',
+                    actionUrl: `rab/${id}`,
+                    data: {
+                        pengajuanType: 'harga-tukang',
+                        rabId: parseInt(id),
+                        rabProyek: rab.proyek,
+                        status: status,
+                        item: item,
+                        qty: qty,
+                        satuan: satuan
+                    }
+                });
+            }
+
+            res.json({
+                status: 'success',
+                message: 'Status pengajuan harga tukang berhasil diperbarui'
+            });
+
+        } catch (error) {
+            console.error('Update harga tukang status error:', error);
             res.status(500).json({
                 status: 'error',
                 message: 'Terjadi kesalahan pada server',

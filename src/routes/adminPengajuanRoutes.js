@@ -35,4 +35,8 @@ router.patch('/tukang/:id/update-status', AdminPengajuanController.updateTukangS
 router.get('/kerja-tambah', AdminPengajuanController.getKerjaTambahList);
 router.patch('/kerja-tambah/:id/update-status', AdminPengajuanController.updateKerjaTambahStatus);
 
+// Harga Tukang routes
+router.get('/harga-tukang', AdminPengajuanController.getHargaTukangList);
+router.patch('/harga-tukang/:id/update-status', AdminPengajuanController.updateHargaTukangStatus);
+
 module.exports = router;

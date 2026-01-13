@@ -455,13 +455,20 @@ class RabController {
                         const qty = parseFloat(item.qty) || 0;
                         const totalHarga = Math.round(hargaSatuan * qty);
 
+                        // Preserve status from request, or default to 'Pengajuan'
+                        // If status is "Ditolak", reset to "Pengajuan" (allow resubmission)
+                        let finalStatus = item.status || 'Pengajuan';
+                        if (finalStatus === 'Ditolak') {
+                            finalStatus = 'Pengajuan'; // Reset rejected status to allow resubmission
+                        }
+
                         const cleanItem = {
                             item: item.item || '',
                             satuan: item.satuan || '',
                             qty: parseFloat(qty).toFixed(2), // String dengan 2 desimal
                             harga_satuan: hargaSatuan, // Number
                             total_harga: totalHarga, // Number
-                            status: 'Pengajuan' // Always Pengajuan
+                            status: finalStatus // Preserve status from request
                         };
                         
                         console.log('Clean item:', JSON.stringify(cleanItem, null, 2));
