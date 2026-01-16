@@ -894,6 +894,138 @@ class RabController {
             });
         }
     }
+
+    /**
+     * Update material pendukung expenses
+     */
+    static async updateMaterialPendukung(req, res) {
+        try {
+            const { id } = req.params;
+            const supervisiId = req.user.id;
+            const { json_pengeluaran_material_pendukung } = req.body;
+
+            // Verify RAB belongs to this supervisi
+            const [rabs] = await db.query(
+                'SELECT id FROM rancangan_anggaran_biaya WHERE id = ? AND supervisi_id = ? AND status_deleted = 0',
+                [id, supervisiId]
+            );
+
+            if (rabs.length === 0) {
+                return res.status(404).json({
+                    status: 'error',
+                    message: 'RAB tidak ditemukan atau Anda tidak memiliki akses'
+                });
+            }
+
+            // Clean and validate data (same format as material tambahan but with ukuran and panjang)
+            const cleanData = [];
+            if (Array.isArray(json_pengeluaran_material_pendukung)) {
+                for (const mr of json_pengeluaran_material_pendukung) {
+                    const cleanMaterials = [];
+                    if (Array.isArray(mr.materials)) {
+                        for (const material of mr.materials) {
+                            if (material.supplier || material.item || material.qty || material.harga_satuan) {
+                                cleanMaterials.push({
+                                    supplier: material.supplier || '',
+                                    item: material.item || '',
+                                    ukuran: material.ukuran || '',
+                                    panjang: material.panjang || '',
+                                    qty: parseFloat(material.qty) || 0,
+                                    satuan: material.satuan || '',
+                                    harga_satuan: parseFloat(material.harga_satuan) || 0,
+                                    status: material.status || 'Pengajuan',
+                                    sub_total: parseFloat(material.sub_total) || 0
+                                });
+                            }
+                        }
+                    }
+                    if (cleanMaterials.length > 0) {
+                        cleanData.push({
+                            mr: mr.mr || '',
+                            tanggal: mr.tanggal || '',
+                            materials: cleanMaterials
+                        });
+                    }
+                }
+            }
+
+            // Get existing data to compare with new data
+            const [existingRabs] = await db.query(
+                'SELECT json_pengeluaran_material_pendukung FROM rancangan_anggaran_biaya WHERE id = ?',
+                [id]
+            );
+            let existingData = [];
+            if (existingRabs[0]?.json_pengeluaran_material_pendukung) {
+                try {
+                    existingData = JSON.parse(existingRabs[0].json_pengeluaran_material_pendukung) || [];
+                } catch (e) {
+                    existingData = [];
+                }
+            }
+
+            // Count pengajuan (status "Pengajuan") in existing data
+            const existingPengajuanCount = existingData.reduce((count, mr) => {
+                if (mr.materials && Array.isArray(mr.materials)) {
+                    return count + mr.materials.filter(mat => mat.status === 'Pengajuan').length;
+                }
+                return count;
+            }, 0);
+
+            // Count pengajuan (status "Pengajuan") in new data
+            const newPengajuanCount = cleanData.reduce((count, mr) => {
+                if (mr.materials && Array.isArray(mr.materials)) {
+                    return count + mr.materials.filter(mat => mat.status === 'Pengajuan').length;
+                }
+                return count;
+            }, 0);
+
+            // Check if there are new pengajuan (count increased)
+            const hasNewPengajuan = newPengajuanCount > existingPengajuanCount;
+
+            // Get RAB info for notification
+            const [rabInfo] = await db.query(
+                'SELECT proyek, pekerjaan FROM rancangan_anggaran_biaya WHERE id = ?',
+                [id]
+            );
+            const rabProyek = rabInfo[0]?.proyek || 'RAB';
+
+            // Update RAB
+            await db.query(
+                'UPDATE rancangan_anggaran_biaya SET json_pengeluaran_material_pendukung = ? WHERE id = ?',
+                [JSON.stringify(cleanData), id]
+            );
+
+            // Send notification to masters only if there are new pengajuan
+            if (hasNewPengajuan) {
+                await sendNotificationToMasters({
+                    title: 'Pengajuan Material Pendukung Baru',
+                    body: `Supervisi membuat pengajuan material pendukung untuk proyek: ${rabProyek}`,
+                    type: 'pengajuan',
+                    relatedId: parseInt(id),
+                    relatedType: 'RancanganAnggaranBiaya',
+                    actionUrl: `pengajuan/material-pendukung/${id}`,
+                    data: {
+                        pengajuanType: 'material_pendukung',
+                        rabId: parseInt(id),
+                        rabProyek: rabProyek
+                    }
+                });
+            }
+
+            res.json({
+                status: 'success',
+                message: 'Data pengeluaran material pendukung berhasil diperbarui'
+            });
+
+        } catch (error) {
+            console.error('Update material pendukung error:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Terjadi kesalahan pada server',
+                error: error.message
+            });
+        }
+    }
 }
 
 module.exports = RabController;

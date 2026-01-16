@@ -32,5 +32,6 @@ router.put('/rab/:id/harga-tukang', RabController.updateHargaTukang);
 router.put('/rab/:id/tukang', RabController.updateTukang);
 router.put('/rab/:id/kerja-tambah', RabController.updateKerjaTambah);
 router.put('/rab/:id/material-tambahan', RabController.updateMaterialTambahan);
+router.put('/rab/:id/material-pendukung', RabController.updateMaterialPendukung);
 
 module.exports = router;

@@ -433,6 +433,226 @@ class AdminPengajuanController {
     }
 
     /**
+     * Get material pendukung list for admin
+     */
+    static async getMaterialPendukungList(req, res) {
+        try {
+            const { status_filter } = req.query;
+
+            const query = `
+                SELECT 
+                    rab.id,
+                    rab.proyek,
+                    rab.pekerjaan,
+                    rab.status as rab_status,
+                    rab.supervisi_id,
+                    rab.json_pengeluaran_material_pendukung,
+                    u.name as supervisi_nama
+                FROM rancangan_anggaran_biaya rab
+                LEFT JOIN users u ON rab.supervisi_id = u.id
+                WHERE rab.json_pengeluaran_material_pendukung IS NOT NULL 
+                AND rab.json_pengeluaran_material_pendukung != '[]'
+                AND rab.status != 'selesai'
+                AND rab.status_deleted = 0
+                ORDER BY rab.created_at DESC
+            `;
+
+            const [rabs] = await db.query(query);
+
+            const materialPendukungs = [];
+            rabs.forEach(rab => {
+                let jsonData = [];
+                try {
+                    jsonData = JSON.parse(rab.json_pengeluaran_material_pendukung) || [];
+                } catch (e) {
+                    jsonData = [];
+                }
+
+                if (Array.isArray(jsonData)) {
+                    jsonData.forEach((mrGroup, mrIndex) => {
+                        if (mrGroup.materials && Array.isArray(mrGroup.materials)) {
+                            mrGroup.materials.forEach((material, materialIndex) => {
+                                // Skip data yang semua field-nya null atau kosong (sesuai Laravel)
+                                if (!material.supplier && !material.item && !material.qty && 
+                                    !material.satuan && !material.harga_satuan && !material.sub_total) {
+                                    return;
+                                }
+
+                                // Extract numeric value (sesuai Laravel extractNumericValue method)
+                                // Handle Indonesian format: "Rp 2.500.000" (dots as thousands separator)
+                                const extractNumericValue = (value) => {
+                                    if (typeof value === 'number') {
+                                        return parseFloat(value) || 0;
+                                    }
+                                    if (typeof value === 'string') {
+                                        // Remove Rp, spaces, commas, and ALL dots (Indonesian uses dots as thousands separator)
+                                        // Format: "Rp 2.500.000" -> "2500000"
+                                        let cleanValue = value.replace(/Rp|[\s,]/g, '').replace(/\./g, '');
+                                        return cleanValue ? parseFloat(cleanValue) || 0 : 0;
+                                    }
+                                    return 0;
+                                };
+
+                                materialPendukungs.push({
+                                    rab_id: rab.id,
+                                    rab_proyek: rab.proyek,
+                                    rab_pekerjaan: rab.pekerjaan,
+                                    rab_status: rab.rab_status,
+                                    supervisi_id: rab.supervisi_id,
+                                    supervisi_nama: rab.supervisi_nama || '-',
+                                    mr: mrGroup.mr || '-',
+                                    tanggal: (mrGroup.tanggal && mrGroup.tanggal !== '-') ? mrGroup.tanggal : null,
+                                    supplier: material.supplier || '-',
+                                    item: material.item || '-',
+                                    ukuran: material.ukuran || '-',
+                                    panjang: material.panjang || '-',
+                                    qty: material.qty || '-',
+                                    satuan: material.satuan || '-',
+                                    harga_satuan: extractNumericValue(material.harga_satuan),
+                                    sub_total: extractNumericValue(material.sub_total),
+                                    status: material.status || 'Pengajuan',
+                                    mr_index: mrIndex,
+                                    material_index: materialIndex
+                                });
+                            });
+                        }
+                    });
+                }
+            });
+
+            let filteredData = materialPendukungs;
+            if (status_filter) {
+                filteredData = materialPendukungs.filter(item => item.status === status_filter);
+            }
+
+            // Sort by tanggal descending (sesuai Laravel)
+            filteredData.sort((a, b) => {
+                if (!a.tanggal && !b.tanggal) return 0;
+                if (!a.tanggal) return 1;
+                if (!b.tanggal) return -1;
+                return new Date(b.tanggal) - new Date(a.tanggal);
+            });
+
+            res.json({
+                status: 'success',
+                materialPendukungs: filteredData
+            });
+
+        } catch (error) {
+            console.error('Get material pendukung list error:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Terjadi kesalahan pada server',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Update material pendukung status
+     */
+    static async updateMaterialPendukungStatus(req, res) {
+        try {
+            const { id } = req.params;
+            const { material_pendukung_index, material_index, status } = req.body;
+
+            if (!['Pengajuan', 'Disetujui', 'Ditolak'].includes(status)) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'Status tidak valid'
+                });
+            }
+
+            const [rabs] = await db.query(
+                `SELECT rab.json_pengeluaran_material_pendukung, rab.proyek, rab.supervisi_id, u.name as supervisi_name
+                 FROM rancangan_anggaran_biaya rab
+                 LEFT JOIN users u ON rab.supervisi_id = u.id
+                 WHERE rab.id = ? AND rab.status_deleted = 0`,
+                [id]
+            );
+
+            if (rabs.length === 0) {
+                return res.status(404).json({
+                    status: 'error',
+                    message: 'RAB tidak ditemukan'
+                });
+            }
+
+            const rab = rabs[0];
+
+            let materialData = [];
+            try {
+                materialData = JSON.parse(rab.json_pengeluaran_material_pendukung) || [];
+            } catch (e) {
+                materialData = [];
+            }
+
+            if (materialData[material_pendukung_index] &&
+                materialData[material_pendukung_index].materials &&
+                materialData[material_pendukung_index].materials[material_index]) {
+
+                const material = materialData[material_pendukung_index].materials[material_index];
+                const oldStatus = material.status || 'Pengajuan';
+                
+                // Only update if status actually changed
+                if (oldStatus === status) {
+                    return res.json({
+                        status: 'success',
+                        message: 'Status material pendukung berhasil diperbarui'
+                    });
+                }
+
+                material.status = status;
+
+                await db.query(
+                    'UPDATE rancangan_anggaran_biaya SET json_pengeluaran_material_pendukung = ? WHERE id = ?',
+                    [JSON.stringify(materialData), id]
+                );
+
+                // Send notification to supervisi if status changed to Disetujui or Ditolak
+                // (only send if status actually changed, which is already checked above)
+                if (rab.supervisi_id && (status === 'Disetujui' || status === 'Ditolak')) {
+                    const statusText = status === 'Disetujui' ? 'disetujui' : 'ditolak';
+                    await sendNotificationToUser({
+                        userId: rab.supervisi_id,
+                        title: `Pengajuan Material Pendukung ${statusText.charAt(0).toUpperCase() + statusText.slice(1)}`,
+                        body: `Pengajuan material pendukung "${material.item || 'Material'}" untuk proyek ${rab.proyek || 'RAB'} telah ${statusText}`,
+                        type: 'pengajuan',
+                        relatedId: parseInt(id),
+                        relatedType: 'RancanganAnggaranBiaya',
+                        actionUrl: `rab/${id}`,
+                        data: {
+                            pengajuanType: 'material_pendukung',
+                            rabId: parseInt(id),
+                            rabProyek: rab.proyek,
+                            status: status,
+                            materialItem: material.item
+                        }
+                    });
+                }
+
+                res.json({
+                    status: 'success',
+                    message: 'Status material pendukung berhasil diperbarui'
+                });
+            } else {
+                res.status(404).json({
+                    status: 'error',
+                    message: 'Data tidak ditemukan'
+                });
+            }
+
+        } catch (error) {
+            console.error('Update material pendukung status error:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Terjadi kesalahan pada server',
+                error: error.message
+            });
+        }
+    }
+
+    /**
      * Get tukang list for admin
      */
     static async getTukangList(req, res) {

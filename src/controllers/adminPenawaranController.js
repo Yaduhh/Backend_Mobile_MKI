@@ -6,7 +6,7 @@ class AdminPenawaranController {
    */
   static async getAllPenawaran(req, res) {
     try {
-      const { search, user, client, page = 1, limit = 12 } = req.query;
+      const { search, user, client, status, page = 1, limit = 12 } = req.query;
       const offset = (page - 1) * limit;
 
       // Build base query
@@ -50,6 +50,12 @@ class AdminPenawaranController {
         params.push(client);
       }
 
+      // Filter by status
+      if (status !== undefined && status !== null && status !== '') {
+        query += ' AND p.status = ?';
+        params.push(parseInt(status));
+      }
+
       query += ' ORDER BY p.created_at DESC LIMIT ? OFFSET ?';
       params.push(parseInt(limit), parseInt(offset));
 
@@ -84,6 +90,12 @@ class AdminPenawaranController {
       if (client && client !== '') {
         countQuery += ' AND p.id_client = ?';
         countParams.push(client);
+      }
+
+      // Filter by status for count query
+      if (status !== undefined && status !== null && status !== '') {
+        countQuery += ' AND p.status = ?';
+        countParams.push(parseInt(status));
       }
 
       const [countResult] = await db.query(countQuery, countParams);

@@ -27,6 +27,10 @@ router.patch('/entertainment/:id/update-status', AdminPengajuanController.update
 router.get('/material-tambahan', AdminPengajuanController.getMaterialTambahanList);
 router.patch('/material-tambahan/:id/update-status', AdminPengajuanController.updateMaterialTambahanStatus);
 
+// Material Pendukung routes
+router.get('/material-pendukung', AdminPengajuanController.getMaterialPendukungList);
+router.patch('/material-pendukung/:id/update-status', AdminPengajuanController.updateMaterialPendukungStatus);
+
 // Tukang routes
 router.get('/tukang', AdminPengajuanController.getTukangList);
 router.patch('/tukang/:id/update-status', AdminPengajuanController.updateTukangStatus);
