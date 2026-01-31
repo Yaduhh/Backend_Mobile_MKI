@@ -358,8 +358,8 @@ class NotificationController {
         });
       }
 
-      // Check if current user is admin (master = 1)
-      if (req.user.master !== 1) {
+      // Check if current user is admin (role = 1)
+      if (req.user.role !== 1) {
         return res.status(403).json({
           success: false,
           message: 'Hanya admin yang dapat mengirim broadcast'
