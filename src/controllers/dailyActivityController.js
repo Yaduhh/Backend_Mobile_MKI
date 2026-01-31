@@ -514,7 +514,7 @@ class DailyActivityController {
               ),
               ...dokumentasiArr,
             ];
-          } catch (e) {}
+          } catch (e) { }
         }
         perihal = req.body.perihal;
         pihak_bersangkutan = req.body.pihak_bersangkutan;
@@ -986,6 +986,29 @@ class DailyActivityController {
         activity.dokumentasi = JSON.parse(activity.dokumentasi || "[]");
         activity.komentar = JSON.parse(activity.komentar || "[]");
 
+        // Get user info for notification
+        const [userInfo] = await db.query(
+          'SELECT name FROM users WHERE id = ?',
+          [created_by]
+        );
+        const userName = userInfo[0]?.name || 'Staff';
+
+        // Send notification to masters (admin)
+        await sendNotificationToMasters({
+          title: 'Kunjungan Supervisi Baru',
+          body: `${userName} membuat kunjungan supervisi baru: ${perihal}`,
+          type: 'kunjungan',
+          relatedId: parseInt(result.insertId),
+          relatedType: 'DailyActivity',
+          actionUrl: `kunjungan/${result.insertId}`,
+          data: {
+            activityId: parseInt(result.insertId),
+            perihal: perihal,
+            userName: userName,
+            createdBy: created_by
+          }
+        });
+
         res.status(201).json({
           success: true,
           data: activity,
@@ -1129,7 +1152,7 @@ class DailyActivityController {
       });
     }
   }
-  
+
   static async getSupervisiDailyActivityById(req, res) {
     try {
       const { id } = req.params;

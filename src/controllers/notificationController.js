@@ -26,7 +26,7 @@ class NotificationController {
 
       if (existingToken.length > 0) {
         const existing = existingToken[0];
-        
+
         // Jika token sudah ada untuk user yang sama
         if (existing.user_id === userId) {
           // Update existing token
@@ -336,6 +336,118 @@ class NotificationController {
       });
     } catch (error) {
       console.error('Logout error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Terjadi kesalahan pada server',
+        error: error.message
+      });
+    }
+  }
+  /**
+   * Broadcast notification to all users
+   * POST /api/notifications/broadcast
+   */
+  static async broadcastNotification(req, res) {
+    try {
+      const { title, body, data = {} } = req.body;
+
+      if (!title || !body) {
+        return res.status(400).json({
+          success: false,
+          message: 'Title dan Body harus diisi'
+        });
+      }
+
+      // Check if current user is admin (master = 1)
+      if (req.user.master !== 1) {
+        return res.status(403).json({
+          success: false,
+          message: 'Hanya admin yang dapat mengirim broadcast'
+        });
+      }
+
+      // 1. Get all active users
+      const [users] = await db.query(
+        'SELECT id FROM users WHERE status_deleted = 0'
+      );
+
+      if (users.length === 0) {
+        return res.json({
+          success: true,
+          message: 'Tidak ada user aktif untuk dikirimkan notifikasi'
+        });
+      }
+
+      // 2. Get all active device tokens
+      const [tokens] = await db.query(
+        'SELECT device_token FROM device_tokens WHERE is_active = 1'
+      );
+
+      // 3. Send push notifications via Expo
+      if (tokens.length > 0) {
+        const axios = require('axios');
+        // Expo limit is 100 messages per request
+        const chunks = [];
+        for (let i = 0; i < tokens.length; i += 100) {
+          chunks.push(tokens.slice(i, i + 100));
+        }
+
+        for (const chunk of chunks) {
+          const messages = chunk.map(token => ({
+            to: token.device_token,
+            sound: 'default',
+            title: title,
+            body: body,
+            data: {
+              type: 'broadcast',
+              ...data
+            },
+            priority: 'high',
+          }));
+
+          try {
+            await axios.post('https://exp.host/--/api/v2/push/send', messages, {
+              headers: {
+                'Accept': 'application/json',
+                'Accept-Encoding': 'gzip, deflate',
+                'Content-Type': 'application/json',
+              },
+            });
+          } catch (pushError) {
+            console.error('Expo push error:', pushError.message);
+          }
+        }
+      }
+
+      // 4. Save to notifications table for all users
+      const insertQuery = `
+        INSERT INTO notifications 
+        (user_id, title, body, type, is_read, data, created_at, updated_at)
+        VALUES ?
+      `;
+
+      const now = new Date();
+      const insertValues = users.map(user => [
+        user.id,
+        title,
+        body,
+        'broadcast',
+        0,
+        JSON.stringify(data),
+        now,
+        now
+      ]);
+
+      await db.query(insertQuery, [insertValues]);
+
+      return res.json({
+        success: true,
+        message: `Broadcast berhasil dikirim ke ${users.length} user`,
+        recipientCount: users.length
+      });
+
+    } catch (error) {
+      console.error('Broadcast notification error:', error);
       res.status(500).json({
         success: false,
         message: 'Terjadi kesalahan pada server',
