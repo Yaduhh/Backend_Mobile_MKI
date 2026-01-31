@@ -13,6 +13,7 @@ const adminArsipFileRoutes = require('./routes/adminArsipFileRoutes');
 const rabRoutes = require('./routes/rabRoutes');
 const adminPengajuanRoutes = require('./routes/adminPengajuanRoutes');
 const adminRabRoutes = require('./routes/adminRabRoutes');
+const supervisiPengajuanRoutes = require('./routes/supervisiPengajuanRoutes');
 
 const app = express();
 
@@ -45,6 +46,7 @@ app.use('/api/admin/events', eventRoutes);
 app.use('/api/admin/arsip-files', adminArsipFileRoutes);
 app.use('/api/admin/pengajuan', adminPengajuanRoutes);
 app.use('/api/admin/rancangan-anggaran-biaya', adminRabRoutes);
+app.use('/api/supervisi/pengajuan', supervisiPengajuanRoutes);
 app.use('/api/supervisi', rabRoutes);
 
 // Error handling

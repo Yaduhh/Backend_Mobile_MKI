@@ -2,6 +2,41 @@ const db = require('../config/database');
 
 class AdminPenawaranController {
   /**
+   * Get penawaran stats for dashboard
+   */
+  static async getPenawaranStats(req, res) {
+    try {
+      const [statsResult] = await db.query(`
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) as win,
+          SUM(CASE WHEN status = 2 THEN 1 ELSE 0 END) as lose,
+          SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END) as draft
+        FROM penawaran
+        WHERE status_deleted = false
+        AND penawaran_pintu = false
+      `);
+
+      res.json({
+        success: true,
+        data: {
+          total: parseInt(statsResult[0].total) || 0,
+          win: parseInt(statsResult[0].win) || 0,
+          lose: parseInt(statsResult[0].lose) || 0,
+          draft: parseInt(statsResult[0].draft) || 0,
+        }
+      });
+    } catch (error) {
+      console.error('Get penawaran stats error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Terjadi kesalahan saat mengambil statistik penawaran',
+        error: error.message
+      });
+    }
+  }
+
+  /**
    * Get all penawaran with filters
    */
   static async getAllPenawaran(req, res) {
@@ -524,7 +559,7 @@ class AdminPenawaranController {
     try {
       const { id } = req.params;
       const axios = require('axios');
-      
+
       // Laravel web URL - try IP address (192.168.1.10:8000) or localhost
       let LARAVEL_BASE_URL = process.env.LARAVEL_BASE_URL;
       if (!LARAVEL_BASE_URL) {
@@ -532,9 +567,9 @@ class AdminPenawaranController {
         LARAVEL_BASE_URL = 'http://192.168.1.10:8000';
       }
       const laravelUrl = `${LARAVEL_BASE_URL}/admin/penawaran/cetak/${id}`;
-      
+
       console.log('Proxying PDF request to:', laravelUrl);
-      
+
       // Forward request to Laravel
       const response = await axios({
         method: 'GET',
@@ -559,11 +594,11 @@ class AdminPenawaranController {
       response.data.pipe(res);
     } catch (error) {
       console.error('Error in cetak PDF:', error);
-      
+
       // Return Laravel URL so mobile can open it directly in browser
       let LARAVEL_BASE_URL_FALLBACK = process.env.LARAVEL_BASE_URL || 'http://192.168.1.10:8000';
       const laravelUrl = `${LARAVEL_BASE_URL_FALLBACK}/admin/penawaran/cetak/${req.params.id}`;
-      
+
       res.status(500).json({
         success: false,
         message: 'Gagal generate PDF melalui proxy. Silakan buka di browser.',

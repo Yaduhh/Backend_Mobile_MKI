@@ -18,7 +18,7 @@ async function sendNotificationToMasters(options) {
 
     // Get all users with master = 1
     const [masters] = await db.query(
-      'SELECT id, name FROM users WHERE master = 1 AND status_deleted = 0'
+      'SELECT id, name FROM users WHERE role = 1 AND status_deleted = 0'
     );
 
     if (masters.length === 0) {
@@ -29,7 +29,7 @@ async function sendNotificationToMasters(options) {
     // Get active device tokens for all master users (only is_active = 1)
     const masterIds = masters.map(m => m.id);
     const placeholders = masterIds.map(() => '?').join(',');
-    
+
     const [tokens] = await db.query(
       `SELECT dt.user_id, dt.device_token, u.name 
        FROM device_tokens dt

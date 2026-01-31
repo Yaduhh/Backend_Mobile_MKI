@@ -45,7 +45,7 @@ class AdminPengajuanController {
                         if (mrGroup.materials && Array.isArray(mrGroup.materials)) {
                             mrGroup.materials.forEach((material, materialIndex) => {
                                 // Skip data yang semua field-nya null atau kosong (sesuai Laravel)
-                                if (!material.supplier && !material.item && !material.qty && 
+                                if (!material.supplier && !material.item && !material.qty &&
                                     !material.satuan && !material.harga_satuan && !material.sub_total) {
                                     return;
                                 }
@@ -154,7 +154,7 @@ class AdminPengajuanController {
 
                 const material = entertainmentData[entertainment_index].materials[material_index];
                 const oldStatus = material.status || 'Pengajuan';
-                
+
                 // Only update if status actually changed
                 if (oldStatus === status) {
                     return res.json({
@@ -255,7 +255,7 @@ class AdminPengajuanController {
                         if (mrGroup.materials && Array.isArray(mrGroup.materials)) {
                             mrGroup.materials.forEach((material, materialIndex) => {
                                 // Skip data yang semua field-nya null atau kosong (sesuai Laravel)
-                                if (!material.supplier && !material.item && !material.qty && 
+                                if (!material.supplier && !material.item && !material.qty &&
                                     !material.satuan && !material.harga_satuan && !material.sub_total) {
                                     return;
                                 }
@@ -373,7 +373,7 @@ class AdminPengajuanController {
 
                 const material = materialData[material_tambahan_index].materials[material_index];
                 const oldStatus = material.status || 'Pengajuan';
-                
+
                 // Only update if status actually changed
                 if (oldStatus === status) {
                     return res.json({
@@ -473,7 +473,7 @@ class AdminPengajuanController {
                         if (mrGroup.materials && Array.isArray(mrGroup.materials)) {
                             mrGroup.materials.forEach((material, materialIndex) => {
                                 // Skip data yang semua field-nya null atau kosong (sesuai Laravel)
-                                if (!material.supplier && !material.item && !material.qty && 
+                                if (!material.supplier && !material.item && !material.qty &&
                                     !material.satuan && !material.harga_satuan && !material.sub_total) {
                                     return;
                                 }
@@ -593,7 +593,7 @@ class AdminPengajuanController {
 
                 const material = materialData[material_pendukung_index].materials[material_index];
                 const oldStatus = material.status || 'Pengajuan';
-                
+
                 // Only update if status actually changed
                 if (oldStatus === status) {
                     return res.json({
@@ -693,7 +693,7 @@ class AdminPengajuanController {
                         if (section.termin && Array.isArray(section.termin)) {
                             section.termin.forEach((termin, terminIndex) => {
                                 // Skip data yang semua field-nya null atau kosong (sesuai Laravel)
-                                if (!termin.tanggal && !termin.kredit && 
+                                if (!termin.tanggal && !termin.kredit &&
                                     !termin.sisa && !termin.persentase) {
                                     return;
                                 }
@@ -879,7 +879,7 @@ class AdminPengajuanController {
 
                 const termin = tukangData[section_index].termin[termin_index];
                 const oldStatus = termin.status || 'Pengajuan';
-                
+
                 // Only update if status actually changed
                 if (oldStatus === status) {
                     return res.json({
@@ -953,6 +953,7 @@ class AdminPengajuanController {
                     rab.pekerjaan,
                     rab.kontraktor,
                     rab.lokasi,
+                    rab.status as rab_status,
                     rab.json_kerja_tambah
                 FROM rancangan_anggaran_biaya rab
                 WHERE rab.json_kerja_tambah IS NOT NULL 
@@ -974,9 +975,9 @@ class AdminPengajuanController {
                 }
 
                 if (Array.isArray(jsonData)) {
-                    jsonData.forEach(section => {
+                    jsonData.forEach((section, sectionIndex) => {
                         if (section.termin && Array.isArray(section.termin)) {
-                            section.termin.forEach(termin => {
+                            section.termin.forEach((termin, terminIndex) => {
                                 kerjaTambahData.push({
                                     id: rab.id,
                                     proyek: rab.proyek,
@@ -988,7 +989,10 @@ class AdminPengajuanController {
                                     sisa: parseFloat(termin.sisa) || 0,
                                     persentase: termin.persentase || '-',
                                     status: termin.status || 'Pengajuan',
-                                    debet: parseFloat(section.debet) || 0
+                                    debet: parseFloat(section.debet) || 0,
+                                    rab_status: rab.rab_status,
+                                    section_index: sectionIndex,
+                                    termin_index: terminIndex
                                 });
                             });
                         }
@@ -1031,7 +1035,7 @@ class AdminPengajuanController {
     static async updateKerjaTambahStatus(req, res) {
         try {
             const { id } = req.params;
-            const { tanggal, kredit, status } = req.body;
+            const { section_index, termin_index, status } = req.body;
 
             if (!['Pengajuan', 'Disetujui', 'Ditolak'].includes(status)) {
                 return res.status(400).json({
@@ -1064,49 +1068,37 @@ class AdminPengajuanController {
                 kerjaTambahData = [];
             }
 
-            let updated = false;
-            let terminIndex = 0;
-            let oldStatus = null;
-            for (let sectionIndex = 0; sectionIndex < kerjaTambahData.length; sectionIndex++) {
-                const section = kerjaTambahData[sectionIndex];
-                if (section.termin && Array.isArray(section.termin)) {
-                    for (let i = 0; i < section.termin.length; i++) {
-                        const termin = section.termin[i];
-                        if (termin.tanggal === tanggal && parseFloat(termin.kredit) == parseFloat(kredit)) {
-                            oldStatus = termin.status || 'Pengajuan';
-                            
-                            // Only update if status actually changed
-                            if (oldStatus === status) {
-                                return res.json({
-                                    status: 'success',
-                                    message: 'Status termin kerja tambah berhasil diperbarui'
-                                });
-                            }
-                            
-                            termin.status = status;
-                            terminIndex = i + 1;
-                            updated = true;
-                            break;
-                        }
-                    }
-                }
-                if (updated) break;
-            }
+            if (kerjaTambahData[section_index] &&
+                kerjaTambahData[section_index].termin &&
+                kerjaTambahData[section_index].termin[termin_index]) {
 
-            if (updated) {
+                const termin = kerjaTambahData[section_index].termin[termin_index];
+                const oldStatus = termin.status || 'Pengajuan';
+                const kredit = termin.kredit;
+
+                // Only update if status actually changed
+                if (oldStatus === status) {
+                    return res.json({
+                        status: 'success',
+                        message: 'Status termin kerja tambah berhasil diperbarui'
+                    });
+                }
+
+                termin.status = status;
+                const terminNumber = termin_index + 1;
+
                 await db.query(
                     'UPDATE rancangan_anggaran_biaya SET json_kerja_tambah = ? WHERE id = ?',
                     [JSON.stringify(kerjaTambahData), id]
                 );
 
                 // Send notification to supervisi if status changed to Disetujui or Ditolak
-                // (only send if status actually changed, which is already checked above)
                 if (rab.supervisi_id && (status === 'Disetujui' || status === 'Ditolak')) {
                     const statusText = status === 'Disetujui' ? 'disetujui' : 'ditolak';
                     await sendNotificationToUser({
                         userId: rab.supervisi_id,
                         title: `Pengajuan Kerja Tambah ${statusText.charAt(0).toUpperCase() + statusText.slice(1)}`,
-                        body: `Pengajuan kerja tambah (Termin ${terminIndex}) untuk proyek ${rab.proyek || 'RAB'} telah ${statusText}`,
+                        body: `Pengajuan kerja tambah (Termin ${terminNumber}) untuk proyek ${rab.proyek || 'RAB'} telah ${statusText}`,
                         type: 'pengajuan',
                         relatedId: parseInt(id),
                         relatedType: 'RancanganAnggaranBiaya',
@@ -1116,7 +1108,7 @@ class AdminPengajuanController {
                             rabId: parseInt(id),
                             rabProyek: rab.proyek,
                             status: status,
-                            terminIndex: terminIndex,
+                            terminIndex: terminNumber,
                             kredit: kredit
                         }
                     });
@@ -1205,9 +1197,9 @@ class AdminPengajuanController {
                 if (existingItemName === normalizedItem &&
                     existingSatuan === normalizedSatuan &&
                     Math.abs(existingQty - itemQty) < 0.01) {
-                    
+
                     const oldStatus = existingItem.status || 'Pengajuan';
-                    
+
                     // Only update if status actually changed
                     if (oldStatus === status) {
                         return res.json({

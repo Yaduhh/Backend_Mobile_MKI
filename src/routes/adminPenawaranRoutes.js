@@ -22,6 +22,9 @@ router.use(adminAuth);
 // Get all penawaran (harus sebelum /:id)
 router.get('/', AdminPenawaranController.getAllPenawaran);
 
+// Get stats for dashboard (harus sebelum /:id)
+router.get('/stats', AdminPenawaranController.getPenawaranStats);
+
 // Get users for filter (harus sebelum /:id)
 router.get('/users', AdminPenawaranController.getUsers);
 
