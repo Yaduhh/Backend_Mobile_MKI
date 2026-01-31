@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
+// Initialize Push Notification Helper (Firebase & Expo)
+require('./src/utils/pushNotification');
 
 const authRoutes = require('./src/routes/authRoutes');
 const clientRoutes = require('./src/routes/clientRoutes');
