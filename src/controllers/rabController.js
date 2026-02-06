@@ -205,10 +205,10 @@ class RabController {
             let parsedPemasanganJson = null;
             if (rab.pemasangan_json) {
                 try {
-                    parsedPemasanganJson = typeof rab.pemasangan_json === 'string' 
-                        ? JSON.parse(rab.pemasangan_json) 
+                    parsedPemasanganJson = typeof rab.pemasangan_json === 'string'
+                        ? JSON.parse(rab.pemasangan_json)
                         : rab.pemasangan_json;
-                    
+
                     // Struktur json_pemasangan: array of sections, setiap section punya items
                     if (Array.isArray(parsedPemasanganJson)) {
                         parsedPemasanganJson.forEach((section) => {
@@ -254,9 +254,9 @@ class RabController {
             // Remove duplicate fields
             delete formattedRab.pemasangan_json;
 
-            console.log('Formatted RAB response - json_pengajuan_harga_tukang:', 
+            console.log('Formatted RAB response - json_pengajuan_harga_tukang:',
                 JSON.stringify(formattedRab.json_pengajuan_harga_tukang, null, 2));
-            console.log('Formatted RAB response - pemasangan:', 
+            console.log('Formatted RAB response - pemasangan:',
                 formattedRab.pemasangan ? {
                     id: formattedRab.pemasangan.id,
                     nomor_pemasangan: formattedRab.pemasangan.nomor_pemasangan,
@@ -316,6 +316,7 @@ class RabController {
                                     qty: parseFloat(material.qty) || 0,
                                     satuan: material.satuan || '',
                                     harga_satuan: parseFloat(material.harga_satuan) || 0,
+                                    ppn: parseFloat(material.ppn) || 0,
                                     status: material.status || 'Pengajuan',
                                     sub_total: parseFloat(material.sub_total) || 0
                                 });
@@ -446,11 +447,11 @@ class RabController {
                 console.log('Processing array with', json_pengajuan_harga_tukang.length, 'items');
                 for (const item of json_pengajuan_harga_tukang) {
                     console.log('Processing item:', JSON.stringify(item, null, 2));
-                    
+
                     if (item.item && item.harga_satuan) {
                         // Handle both number and string format
-                        const hargaSatuan = typeof item.harga_satuan === 'number' 
-                            ? item.harga_satuan 
+                        const hargaSatuan = typeof item.harga_satuan === 'number'
+                            ? item.harga_satuan
                             : (parseFloat(item.harga_satuan) || 0);
                         const qty = parseFloat(item.qty) || 0;
                         const totalHarga = Math.round(hargaSatuan * qty);
@@ -470,7 +471,7 @@ class RabController {
                             total_harga: totalHarga, // Number
                             status: finalStatus // Preserve status from request
                         };
-                        
+
                         console.log('Clean item:', JSON.stringify(cleanItem, null, 2));
                         cleanData.push(cleanItem);
                     } else {
@@ -487,7 +488,7 @@ class RabController {
             // Update RAB
             const jsonString = JSON.stringify(cleanData);
             console.log('JSON string to save:', jsonString);
-            
+
             await db.query(
                 'UPDATE rancangan_anggaran_biaya SET json_pengajuan_harga_tukang = ? WHERE id = ?',
                 [jsonString, id]
@@ -801,6 +802,7 @@ class RabController {
                                     qty: parseFloat(material.qty) || 0,
                                     satuan: material.satuan || '',
                                     harga_satuan: parseFloat(material.harga_satuan) || 0,
+                                    ppn: parseFloat(material.ppn) || 0,
                                     status: material.status || 'Pengajuan',
                                     sub_total: parseFloat(material.sub_total) || 0
                                 });
@@ -933,6 +935,7 @@ class RabController {
                                     qty: parseFloat(material.qty) || 0,
                                     satuan: material.satuan || '',
                                     harga_satuan: parseFloat(material.harga_satuan) || 0,
+                                    ppn: parseFloat(material.ppn) || 0,
                                     status: material.status || 'Pengajuan',
                                     sub_total: parseFloat(material.sub_total) || 0
                                 });
